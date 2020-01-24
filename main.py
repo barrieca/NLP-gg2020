@@ -30,7 +30,7 @@ def find_tweets_about_host(data, word_list = []):
     return word_list
 
 def main():
-    data = [json.loads(line) for line in open('c:/Users/Acer/CSClasses/CS337/gg2020/gg2020.json','r',encoding='utf-8')]
+    data = [json.loads(line) for line in open('gg2020.json','r')]
     word_list = find_tweets_about_host(data)
     word_df = pd.DataFrame(word_list, columns=['word'])
     host = find_imdb_person(aggregate_and_sort_df(word_df))

@@ -1,29 +1,42 @@
 import json
-import nltk
-import Levenshtein
+import spacy
+import time
+import imdb
+import pandas as pd
 
-def fuzzy_match(base_str, candidate_str, threshold):
-    dist = Levenshtein.distance(base_str, candidate_str)
-    base_len = len(base_str)
-    return (dist <= round(base_len * threshold))
+def find_imdb_person(df):
+    imdb_obj = imdb.IMDb()
+    noun = df.iloc[0]['word']
+    result = imdb_obj.search_person(noun)
+    if len(result) == 0 or result[0]['name'] != noun:
+        return find_imdb_person(df.iloc[1:,])
+    else:
+        return noun
+
+def aggregate_and_sort_df(df):
+    df['freq'] = df.groupby('word')['word'].transform('count')
+    return df.drop_duplicates().sort_values(by='freq', ascending=False)
+
+def find_tweets_about_host(data, word_list = []):
+    nlp = spacy.load('en_core_web_sm')
+    for d in data:
+        for i in d['text'].split(' '):
+            if i[:4]=='host':
+                var = nlp(d['text'])
+                for word in [*var.noun_chunks]:
+                    word = word.text.strip('•').strip(' ')
+                    word_list.append(word)
+                break
+    return word_list
 
 def main():
-    # download nltk corpa
-    nltk.download('punkt')
-    nltk.download('averaged_perceptron_tagger')
+    data = [json.loads(line) for line in open('gg2020.json','r',encoding='utf-8')]
+    word_list = find_tweets_about_host(data)
+    word_df = pd.DataFrame(word_list, columns=['word'])
+    host = find_imdb_person(aggregate_and_sort_df(word_df))
+    print(host)
 
-    # load tweets
-    with  open('gg2020.json','rb') as tweetfile:
-        tweets = json.load(tweetfile)['tweets']
-    current_tweet = tweets[0]
-    words = nltk.word_tokenize(current_tweet['text'])
-    tags = nltk.pos_tag(words)
-    print(tags)
 
-    # Just testing functions
-    print(Levenshtein.editops('Priyanka','Pryanka'))
-    print(fuzzy_match('Priyanka', 'Pryanka', 0.1))
-    print(fuzzy_match('Priyanka', 'Pryank', 0.1))
-
-if __name__ == "__main__":
-    main()
+t = time.time()
+main()
+print(time.time()-t)

@@ -35,6 +35,7 @@ def find_tweets_about(tweet_list, subject):
     :param tweet_list:
     :param subject:
     :return:
+    Written by Marko.
     '''
     print("Not implemented yet")
 
@@ -44,6 +45,7 @@ def create_noun_chunks(tweet_list, award_name):
     :param tweet_list:
     :param award_name:
     :return:
+    Written by Alex.
     '''
     print("Not implemented yet")
 
@@ -53,24 +55,28 @@ def get_noun_frequencies(df_nouns):
     Returns sorted data frame of unique, candidate nouns.
     :param df_nouns:
     :return:
+    Written by Alex.
     '''
     print("Not implemented yet")
 
-def search_IMDB(df_sorted_nouns, n):
+def filter_with_imdb(df_sorted_nouns, n):
     '''
-    Returns list of tuples of n noun chunks that were successfully found on IMDB, and their frequency.
+    Returns list of tuples of n noun chunks that were successfully found on IMDb, and their frequency.
     :param df_sorted_nouns:
     :param n: The number of candidates.
     :return:
+    Written by Cameron.
     '''
     print("Not implemented yet")
 
-def statistical_truncation(list_candidates, threshold_percent):
+def statistical_truncation(list_candidates, threshold_percent, min):
     '''
 
     :param list_candidates:
     :param threshold_percent:
+    :param min:
     :return: List of answers.
+    Written by Cameron.
     '''
     print("Not implemented yet")
 
@@ -79,6 +85,7 @@ def pre_process_data(json_data):
 
     :param json_data:
     :return: Two lists of tweets (pre-show and non-pre-show) with desirable qualities.
+    Written by Cameron.
     '''
     print("Not implemented yet")
 
@@ -87,6 +94,7 @@ def get_nominees(pre_processed_tweet_list):
 
     :param pre_processed_tweet_list:
     :return: Dictionary containing 27 keys, with list as its value
+    Written by Marko.
     '''
     print("Not implemented yet")
 
@@ -97,6 +105,7 @@ def fuzzy_match(s1, s2, threshold):
     :param s2:
     :param threshold:
     :return:
+    Written by Cameron.
     '''
     print("Not implemented yet")
 
@@ -105,6 +114,7 @@ def find_imdb_movie(df_row):
 
     :param df_row:
     :return:
+    Written by Marko.
     '''
     print("Not implemented yet")
 

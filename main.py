@@ -29,6 +29,87 @@ def find_tweets_about_host(data, word_list = []):
                 break
     return word_list
 
+def find_tweets_about(tweet_list, subject):
+    '''
+    Returns new list of relevant tweets containing subject.
+    :param tweet_list:
+    :param subject:
+    :return:
+    '''
+    print("Not implemented yet")
+
+def create_noun_chunks(tweet_list, award_name):
+    '''
+    Returns dataframe of noun chunks.
+    :param tweet_list:
+    :param award_name:
+    :return:
+    '''
+    print("Not implemented yet")
+
+
+def get_noun_frequencies(df_nouns):
+    '''
+    Returns sorted data frame of unique, candidate nouns.
+    :param df_nouns:
+    :return:
+    '''
+    print("Not implemented yet")
+
+def search_IMDB(df_sorted_nouns, n):
+    '''
+    Returns list of tuples of n noun chunks that were successfully found on IMDB, and their frequency.
+    :param df_sorted_nouns:
+    :param n: The number of candidates.
+    :return:
+    '''
+    print("Not implemented yet")
+
+def statistical_truncation(list_candidates, threshold_percent):
+    '''
+
+    :param list_candidates:
+    :param threshold_percent:
+    :return: List of answers.
+    '''
+    print("Not implemented yet")
+
+def pre_process_data(json_data):
+    '''
+
+    :param json_data:
+    :return: Two lists of tweets (pre-show and non-pre-show) with desirable qualities.
+    '''
+    print("Not implemented yet")
+
+def get_nominees(pre_processed_tweet_list):
+    '''
+
+    :param pre_processed_tweet_list:
+    :return: Dictionary containing 27 keys, with list as its value
+    '''
+    print("Not implemented yet")
+
+def fuzzy_match(s1, s2, threshold):
+    '''
+
+    :param s1:
+    :param s2:
+    :param threshold:
+    :return:
+    '''
+    print("Not implemented yet")
+
+def find_imdb_movie(df_row):
+    '''
+
+    :param df_row:
+    :return:
+    '''
+    print("Not implemented yet")
+
+award_names = []
+
 def main():
     data = [json.loads(line) for line in open('gg2020.json','r',encoding='utf-8')]
     word_list = find_tweets_about_host(data)
@@ -40,3 +121,5 @@ def main():
 t = time.time()
 main()
 print(time.time()-t)
+
+

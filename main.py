@@ -2,6 +2,7 @@ import json
 import spacy
 import time
 import imdb
+import Levenshtein
 import pandas as pd
 
 def find_imdb_person(df):
@@ -69,7 +70,7 @@ def filter_with_imdb(df_sorted_nouns, n):
     '''
     print("Not implemented yet")
 
-def statistical_truncation(list_candidates, threshold_percent, min):
+def statistical_truncation(list_candidates, threshold_percent, min = 0):
     '''
 
     :param list_candidates:
@@ -77,8 +78,19 @@ def statistical_truncation(list_candidates, threshold_percent, min):
     :param min:
     :return: List of answers.
     Written by Cameron.
+
+    Example Usage:
+    tup_list = [('John',500),('Jane',450),('Jim',400),('Jake',399),('Jesse',300)]
+    statistical_truncation(tup_list,0.8) = ['John', 'Jane', 'Jim']
     '''
-    print("Not implemented yet")
+    top_frequency = list_candidates[0][1]
+    result_list = []
+    for candidate in list_candidates:
+        if candidate[1] < top_frequency * threshold_percent and len(result_list) >= min:
+            break
+        else:
+            result_list.append(candidate[0])
+    return result_list
 
 def pre_process_data(json_data):
     '''
@@ -100,14 +112,15 @@ def get_nominees(pre_processed_tweet_list):
 
 def fuzzy_match(s1, s2, threshold):
     '''
-
     :param s1:
     :param s2:
     :param threshold:
     :return:
     Written by Cameron.
     '''
-    print("Not implemented yet")
+    dist = Levenshtein.distance(s1, s2)
+    base_len = len(s1)
+    return (dist <= round(base_len * threshold))
 
 def find_imdb_movie(df_row):
     '''

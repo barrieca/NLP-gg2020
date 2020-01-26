@@ -153,17 +153,10 @@ award_names = []
 
 def main():
     data = [json.loads(line) for line in open('gg2020.json','r',encoding='utf-8')]
-    # word_list = find_tweets_about_host(data)
-    # word_df = pd.DataFrame(word_list, columns=['word'])
-    # host = find_imdb_person(aggregate_and_sort_df(word_df))
-    # print(host)
-    tweet_list = []
-    for d in data:
-        tweet_list.append(d['text'])
-    candidate_tweets = find_tweets_about(tweet_list, 'nomin')
-    for i in range(0, 20):
-        print(candidate_tweets[i])
-        print()
+    word_list = find_tweets_about_host(data)
+    word_df = pd.DataFrame(word_list, columns=['word'])
+    host = find_imdb_person(aggregate_and_sort_df(word_df))
+    print(host)
 
 
 t = time.time()

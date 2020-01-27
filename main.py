@@ -64,8 +64,17 @@ def create_noun_chunks(tweet_list, award_name):
     :return:
     Written by Alex.
     '''
-    print("Not implemented yet")
-
+    noun_list = []
+    nlp = spacy.load('en_core_web_sm')
+    award_name = award_name.split('-')
+    for tweet in tweet_list:
+        if all(tweet.contains(name) for name in award_name):
+            var = nlp(tweet)
+            for noun in [*var.noun_chunks]:
+                noun = noun.text.strip('•').strip(' ')
+                noun_list.append(noun)
+            break
+    return pd.DataFrame(noun_list, columns=['noun_chunk'])
 
 def get_noun_frequencies(df_nouns):
     '''
@@ -74,7 +83,8 @@ def get_noun_frequencies(df_nouns):
     :return:
     Written by Alex.
     '''
-    print("Not implemented yet")
+    df_nouns['freq'] = df_nouns.groupby('noun_chunk')['noun_chunk'].transform('count')
+    return df_nouns.drop_duplicates().sort_values(by='freq', ascending=False)
 
 def statistical_truncation(list_candidates, threshold_percent, min = 0):
     '''
@@ -114,7 +124,6 @@ def get_nominees(pre_processed_tweet_list):
     :return: Dictionary containing 27 keys, with list as its value
     Written by Marko.
     '''
-
     num_possible_nominees = 5
     award_nominees = {}
 
@@ -148,7 +157,7 @@ def fuzzy_match(s1, s2, threshold):
     dist = Levenshtein.distance(s1, s2)
     base_len = len(s1)
     return (dist <= round(base_len * threshold))
-
+  
 def find_imdb_movie(df_row):
     '''
     Searches IMDb to see if the movie title in df_row exists.
@@ -178,5 +187,3 @@ def main():
 t = time.time()
 main()
 print(time.time()-t)
-
-

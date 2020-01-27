@@ -33,9 +33,9 @@ def aggregate_and_sort_df(df):
 def find_tweets_about_host(data, word_list = []):
     nlp = spacy.load('en_core_web_sm')
     for d in data:
-        for i in d['text'].split(' '):
+        for i in d.split(' '):
             if i[:4]=='host':
-                var = nlp(d['text'])
+                var = nlp(d)
                 for word in [*var.noun_chunks]:
                     word = word.text.strip('•').strip(' ')
                     word_list.append(word)
@@ -112,7 +112,29 @@ def pre_process_data(json_data):
     :return: Two lists of tweets (pre-show and non-pre-show) with desirable qualities.
     Written by Cameron.
     '''
-    print("Not implemented yet")
+    negative_words = ['didn\'t', 'not', 'should'] # we can change this list as we see fit
+    preshow_words = ['hope','predict','opinion','want','belie'] # again, we can change this as we see fit, but I think a time analysis would work better
+    pre_show = []
+    non_pre_show = []
+
+    nlp = spacy.load('en_core_web_sm')
+    for d in json_data:
+        add = True
+        preshow = False
+        for i in d['text'].split(' '):
+            if any([i.startswith(word) for word in negative_words]):
+                add = False
+                break
+            elif any([i.startswith(word) for word in preshow_words]):
+                preshow = True
+        if add:
+            if preshow:
+                pre_show.append(d['text'])
+            else:
+                non_pre_show.append(d['text'])
+        #if not any([(any([i.startswith(word) for word in negative_words])) for i in d['text'].split(' ')]):
+        #    non_pre_show.append(d['text'])
+    return (pre_show, non_pre_show)
 
 def get_nominees(pre_processed_tweet_list):
     '''
@@ -140,6 +162,7 @@ award_names = []
 def main():
 
     data = [json.loads(line) for line in open('gg2020.json','r',encoding='utf-8')]
+    (pre_data,data) = pre_process_data(data)
     word_list = find_tweets_about_host(data)
     word_df = pd.DataFrame(word_list, columns=['word'])
     host = find_imdb_objects(aggregate_and_sort_df(word_df), 'name')[0][0]

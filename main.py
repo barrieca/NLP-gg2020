@@ -64,7 +64,7 @@ def create_noun_chunks(tweet_list, award_name):
     nlp = spacy.load('en_core_web_sm')
     award_name = award_name.split('-')
     for tweet in tweet_list:
-        if all(tweet.contains(name) for name in award_name):
+        if all(name in tweet for name in award_name):
             var = nlp(tweet)
             for noun in [*var.noun_chunks]:
                 noun = noun.text.strip('•').strip(' ')

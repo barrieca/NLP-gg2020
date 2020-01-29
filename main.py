@@ -2,6 +2,8 @@ import json
 import spacy
 import time
 import imdb
+import numpy as np
+import itertools
 import Levenshtein
 import pandas as pd
 
@@ -87,12 +89,18 @@ def create_noun_chunks(df_tweet):
     nlp = spacy.load('en_core_web_sm')
 
     # Apply the noun chunking to the remaining text
-    test_func = lambda x: [*nlp(x).noun_chunks]
-    # df_tweet = df_tweet.apply(lambda x: [*nlp(x).noun_chunks], axis=1)
-    print(df_tweet.values)
-    df_noun_chunks = pd.DataFrame()
-    df_noun_chunks['text'] = test_func(df_tweet['text'].values)
-    return df_tweet
+    def find_noun_chunks(tweet_text):
+        return [chunk.text for chunk in [*nlp(tweet_text).noun_chunks]]
+
+    #create a list of tweets
+    array_of_tweets_text = df_tweet['text'].values.flatten()
+
+    #create noun chunks for each individual tweet, chain the noun chunks together, and create a dataframe
+    #of the noun chunks
+    noun_chunks = list(itertools.chain(*[find_noun_chunks(tweet) for tweet in array_of_tweets_text]))
+    df_noun_chunks = pd.DataFrame(noun_chunks, columns=['text'])
+
+    return df_noun_chunks
 
 
 def get_noun_frequencies(df_nouns):
@@ -175,6 +183,7 @@ def get_nominees(df_tweets):
 
     # For each award category
     for category in award_names:
+        t = time.time()
         #try:
         #for i in range(0,1):
          #   category = award_names[i]
@@ -195,6 +204,7 @@ def get_nominees(df_tweets):
 
         award_nominees[category] = imdb_candidates
         print("found the award nominees")
+        print(t-time.time())
       #  except:
       #      continue
 

@@ -2,7 +2,6 @@ import json
 import spacy
 import time
 import imdb
-import numpy as np
 import itertools
 import Levenshtein
 import pandas as pd
@@ -17,14 +16,20 @@ def find_truncated_candidates(df, search_type, min=1):
     '''
     return statistical_truncation(find_imdb_objects(df, search_type, min), 0.7, min)
 
-def find_imdb_objects(df, search_type, n=1):
+def is_valid_movie_year(test_year, award_year):
+    return test_year != '????' and test_year >= award_year-2 and test_year < award_year
+
+def is_valid_series_year(test_year, award_year):
+    return test_year != '????' and test_year >= award_year-15 and test_year < award_year
+
+def find_imdb_objects(df, search_type, year=0, n=1, is_movie=False, fuzzy_threshold=0.25):
     '''
     Returns list of tuples of n noun chunks that were successfully found on IMDb, and their frequency.
     :param df: DataFrame of sorted nouns
     :param search_type: 'name' for person(s) or 'title' for movie(s)
     :param n: The number of candidates (default is 1).
     :return:
-    Written by Cameron.
+    Possible criteria: imdb_obj.get_movie(object.movieID)['rating'] > 7.0
     '''
     imdb_obj = imdb.IMDb()
     search_function = (imdb_obj.search_person if search_type == 'name' else imdb_obj.search_movie)
@@ -32,41 +37,41 @@ def find_imdb_objects(df, search_type, n=1):
     for i, row in df.iterrows():
         noun = row['text']
         result = search_function(noun)
-        if len(result) > 0 and result[0][search_type] == noun:
-            results.append((noun,row['freq']))
+        if search_type == 'title':
+            if is_movie:
+                imdb_candidates = [object['long imdb title'][:-7] for object in result if object['kind'] == 'movie' and
+                                   'year' in object and
+                                   is_valid_movie_year(object['year'], year)]
+                if len(imdb_candidates) > 0:
+                    for candidate in imdb_candidates:
+                        if fuzzy_match(candidate.lower(), noun, fuzzy_threshold):
+                            results.append((candidate,row['freq']))
+            else:
+                imdb_candidates = [object['title'] for object in result if (object['kind'] == 'tv series' or object['kind'] == 'tv mini series' or object['kind'] == 'tv movie') and
+                                   'year' in object and
+                                   is_valid_series_year(object['year'], year)]
+                if len(imdb_candidates) > 0:
+                    for candidate in imdb_candidates:
+                        if fuzzy_match(candidate.lower(), noun, fuzzy_threshold):
+                            results.append((candidate, row['freq']))
+        else:
+            if len(result) > 0 and fuzzy_match(result[0][search_type], noun, fuzzy_threshold):
+                results.append((result[0][search_type], row['freq']))
         if len(results) >= n:
             break
     return results
 
-def aggregate_and_sort_df(df):
-    df['freq'] = df.groupby('word')['word'].transform('count')
-    return df.drop_duplicates().sort_values(by='freq', ascending=False)
-
-def find_tweets_about_host(data, word_list = []):
-    nlp = spacy.load('en_core_web_sm')
-    for d in data:
-        for i in d.split(' '):
-            if i[:4]=='host':
-                var = nlp(d)
-                for word in [*var.noun_chunks]:
-                    word = word.text.strip('•').strip(' ')
-                    word_list.append(word)
-                break
-    return word_list
-
-def find_tweets_about(tweet_list, subject):
+def get_hosts(df_tweets):
     '''
-    Searches each tweet in the list for the subject.
-    :param tweet_list: The list of tweets to search through.
-    :param subject: String denoting the subject to look for.
-    :return: Returns new list of relevant tweets containing the subject.
-    Written by Marko.
+    Filters tweets containing 'host' to find, aggregates, and sorts names in the imdb database.
+    :param df_tweets:
+    :return:
     '''
-    candidate_tweets = []
-    for tweet in tweet_list:
-        if subject in tweet:
-            candidate_tweets.append(tweet)
-    return candidate_tweets
+    df_filtered_tweets = filter_tweets(df_tweets, 'host')
+    print(df_filtered_tweets)
+    df_filtered_tweets = get_noun_frequencies(create_noun_chunks(df_filtered_tweets))
+    print(df_filtered_tweets)
+    return find_truncated_candidates(df_filtered_tweets, 'name')
 
 def filter_tweets(df_tweets, regex_string):
     '''
@@ -78,6 +83,36 @@ def filter_tweets(df_tweets, regex_string):
     '''
     return df_tweets[df_tweets.text.str.contains(regex_string, regex=True)]
 
+def filter_by_category(df_tweets, award_category):
+    '''
+    Filtering the tweets based on the award category.
+    :param df_tweets: A dataframe of tweets with the column 'text'.
+    :param award_category: A string representing the award category.
+    :return: A filtered dataframe of tweets.
+    '''
+
+    df_filtered_tweets = pd.DataFrame(df_tweets)
+
+    if 'picture' in award_category:
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'picture|movie|film')
+    if 'television' in award_category:
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'television|series|tv')
+    if 'actor' in award_category:
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'actor|he|him|his|[^fe]male|[^wo]man')
+    if 'actress' in award_category:
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'actress|she|her|female|woman')
+    if 'television' in award_category:
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'television|series|tv')
+    if 'drama' in award_category:
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'drama')
+    if 'musical' in award_category or 'comedy' in award_category:
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'musical|comedy|music|comed')
+    if 'support' in award_category:
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'support')
+    if 'director' in award_category:
+        df_filtered_tweets= filter_tweets(df_filtered_tweets, 'direct')
+
+    return df_filtered_tweets
 
 def create_noun_chunks(df_tweet):
     '''
@@ -90,7 +125,7 @@ def create_noun_chunks(df_tweet):
 
     # Apply the noun chunking to the remaining text
     def find_noun_chunks(tweet_text):
-        return [chunk.text for chunk in [*nlp(tweet_text).noun_chunks]]
+        return [chunk.text.lower() for chunk in [*nlp(tweet_text).ents] if chunk.text.lower() not in noun_chunk_stop_words]
 
     #create a list of tweets
     array_of_tweets_text = df_tweet['text'].values.flatten()
@@ -114,7 +149,6 @@ def get_noun_frequencies(df_nouns):
 
 def statistical_truncation(list_candidates, threshold_percent, min = 0):
     '''
-
     :param list_candidates:
     :param threshold_percent:
     :param min:
@@ -147,70 +181,57 @@ def split_data_by_time(json_data, start_time):
 
     return df_tweets_before_start[['text']], df_tweets_after_start[['text']]
 
-
-    # negative_words = ['didn\'t', 'not', 'should'] # we can change this list as we see fit
-    # preshow_words = ['hope','predict','opinion','want','belie'] # again, we can change this as we see fit, but I think a time analysis would work better
-    # pre_show = []
-    # non_pre_show = []
-    #
-    # nlp = spacy.load('en_core_web_sm')
-    # for d in json_data:
-    #     add = True
-    #     preshow = False
-    #     for i in d['text'].split(' '):
-    #         if any([i.startswith(word) for word in negative_words]):
-    #             add = False
-    #             break
-    #         elif any([i.startswith(word) for word in preshow_words]):
-    #             preshow = True
-    #     if add:
-    #         if preshow:
-    #             pre_show.append(d['text'])
-    #         else:
-    #             non_pre_show.append(d['text'])
-    #     #if not any([(any([i.startswith(word) for word in negative_words])) for i in d['text'].split(' ')]):
-    #     #    non_pre_show.append(d['text'])
-    # return (pre_show, non_pre_show)
+def get_awards(df_tweets):
+    return []
 
 def get_nominees(df_tweets):
+    return dict([(name, []) for name in award_names])
+
+def get_presenters(df_tweets):
+    return dict([(name, []) for name in award_names])
+
+def get_winner(df_tweets):
     '''
-    Determines the nominees for each award based on the given list of tweets.
+    Determines the winner for each award based on the given list of tweets.
     :param pre_processed_tweet_list: A list of tweets that have been pre-filtered.
     :return: Dictionary containing 27 keys, with list as its value
     '''
-    num_possible_nominees = 5
+    num_possible_winner = 1
+    awards_year = 2020
     award_nominees = {}
 
     # For each award category
     for category in award_names:
         t = time.time()
-        #try:
-        #for i in range(0,1):
-         #   category = award_names[i]
         # Filter tweets by subject string
-        # nominee_tweets = find_tweets_about(pre_processed_tweet_list, 'win')
-        df_nominee_tweets = filter_tweets(df_tweets, "win")
-        print("filtered nominee tweets")
+        df_nominee_tweets = filter_tweets(df_tweets, 'win|won|goes to|congratulations|congrats|congratz')
+
+        # Filter based on the award category
+        df_nominee_tweets = filter_by_category(df_nominee_tweets, category)
+
+        print("filtered nominee tweets | " + str(df_nominee_tweets.size))
+
         # Get the nouns chunks in the remaining tweets
         df_noun_chunks = create_noun_chunks(df_nominee_tweets)
         print("found noun chunks")
+
         # Aggregate and sort the noun chunks
         df_sorted_nouns = get_noun_frequencies(df_noun_chunks)
         print("found noun frequencies")
+
         # Produce the correct number of noun chunks that also exist on IMDb
-        imdb_candidates = find_imdb_objects(df_sorted_nouns, 'title', 10)
 
-        # trunc_candidates = statistical_truncation(imdb_candidates, 0.7, 5)
+        imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], awards_year, num_possible_winner, award_entity_type[category] == 'movie')
+        print("found imdb candidates")
 
-        award_nominees[category] = imdb_candidates
-        print("found the award nominees")
+        # Store winner
+        award_nominees[category] = imdb_candidates[0][0]
+        print("found the award winner")
         print(t-time.time())
-      #  except:
-      #      continue
 
     return award_nominees
 
-def fuzzy_match(s1, s2, threshold):
+def fuzzy_match(s1, s2, threshold=0.25):
     '''
     Uses Levenshtein distance to determine how well two strings match.
     :param s1: String One
@@ -222,8 +243,52 @@ def fuzzy_match(s1, s2, threshold):
     base_len = len(s1)
     return (dist <= round(base_len * threshold))
 
+def entity_typer(award_name):
+    '''
 
-award_names = ['best motion picture - drama', 'best motion picture - musical or comedy', 'best performance by an actress in a motion picture - drama', 'best performance by an actor in a motion picture - drama', 'best performance by an actress in a motion picture - musical or comedy', 'best performance by an actor in a motion picture - musical or comedy', 'best performance by an actress in a supporting role in any motion picture', 'best performance by an actor in a supporting role in any motion picture', 'best director - motion picture', 'best screenplay - motion picture', 'best motion picture - animated', 'best motion picture - foreign language', 'best original score - motion picture', 'best original song - motion picture', 'best television series - drama', 'best television series - musical or comedy', 'best television limited series or motion picture made for television', 'best performance by an actress in a limited series or a motion picture made for television', 'best performance by an actor in a limited series or a motion picture made for television', 'best performance by an actress in a television series - drama', 'best performance by an actor in a television series - drama', 'best performance by an actress in a television series - musical or comedy', 'best performance by an actor in a television series - musical or comedy', 'best performance by an actress in a supporting role in a series, limited series or motion picture made for television', 'best performance by an actor in a supporting role in a series, limited series or motion picture made for television', 'cecil b. demille award']
+    :param award_name:
+    :return:
+    '''
+    if 'actor' in award_name or 'actress' in award_name or 'director' in award_name or 'carol' in award_name or 'cecil' in award_name:
+        return (award_name, 'person')
+    elif 'song' in award_name:
+        return (award_name, 'song')
+    elif 'series' in award_name:
+        return (award_name, 'tv')
+    else:
+        return (award_name, 'movie')
+
+award_names = [
+               'best motion picture - drama',
+               'best motion picture - musical or comedy',
+               'best performance by an actress in a motion picture - drama',
+               'best performance by an actor in a motion picture - drama',
+               'best performance by an actress in a motion picture - musical or comedy',
+               'best performance by an actor in a motion picture - musical or comedy',
+               'best performance by an actress in a supporting role in any motion picture',
+               'best performance by an actor in a supporting role in any motion picture',
+               'best director - motion picture',
+               'best screenplay - motion picture',
+               'best motion picture - animated',
+               'best motion picture - foreign language',
+               'best original score - motion picture',
+               'best original song - motion picture',
+               'best television series - drama',
+               'best television series - musical or comedy',
+               'best television limited series or motion picture made for television',
+               'best performance by an actress in a limited series or a motion picture made for television',
+               'best performance by an actor in a limited series or a motion picture made for television',
+               'best performance by an actress in a television series - drama',
+               'best performance by an actor in a television series - drama',
+               'best performance by an actress in a television series - musical or comedy',
+               'best performance by an actor in a television series - musical or comedy',
+               'best performance by an actress in a supporting role in a series, limited series or motion picture made for television',
+               'best performance by an actor in a supporting role in a series, limited series or motion picture made for television',
+               'cecil b. demille award']
+award_entity_type = dict(map(entity_typer, award_names))
+entity_type_to_imdb_type = {'person': 'name', 'tv': 'title', 'movie': 'title'}
+
+noun_chunk_stop_words = {'i', 'you', 'golden globe', 'golden globes', 'goldenglobes', 'congratulations', '#', 'the golden globes', 'a golden globe', 'the golden globe', 'he', 'she', 'me', 'who', 'they', 'it', 'golden globes 2020', 'goldenglobes2020', 'golden globe award', '#goldenglobes2020', 'globes', '@goldenglobes', 'golden globe awards', 'goldenglobe'}
 
 def main():
 
@@ -233,43 +298,12 @@ def main():
     # Split data into two dataframes: pre-show and after show starts
     pre_data, data = split_data_by_time(data, pd.to_datetime('2020-01-06T01:00:00'))
 
-    print(get_nominees(data))
-
-    # word_list = find_tweets_about_host(data)
-    # word_df = pd.DataFrame(word_list, columns=['word'])
-    # host = find_imdb_objects(aggregate_and_sort_df(word_df), 'name')[0][0]
-    # print(host)
-
+    print(get_hosts(data))
+    #print(get_winner(data))
+    # print(filter_tweets(data, 'present').size)
+    print(get_presenters(data))
 
 
 t = time.time()
 main()
 print(time.time()-t)
-
-# award_names = ["Best Motion Picture – Drama",
-#                "Best Motion Picture – Musical or Comedy",
-#                "Best Motion Picture – Foreign Language",
-#                "Best Motion Picture – Animated",
-#                "Best Director – Motion Picture",
-#                "Best Actor – Motion Picture Drama",
-#                "Best Actor – Motion Picture Musical or Comedy",
-#                "Best Actress – Motion Picture Drama",
-#                "Best Actress – Motion Picture Musical or Comedy",
-#                "Best Supporting Actor – Motion Picture",
-#                "Best Supporting Actress – Motion Picture",
-#                "Best Screenplay – Motion Picture",
-#                "Best Original Score – Motion Picture",
-#                "Best Original Song – Motion Picture",
-#                "Cecil B. DeMille Award for Lifetime Achievement in Motion Pictures",
-#                "Best Television Series – Drama",
-#                "Best Television Series – Musical or Comedy",
-#                "Best Miniseries or Television Film",
-#                "Best Actor – Television Series Drama",
-#                "Best Actor – Television Series Musical or Comedy",
-#                "Best Actor – Miniseries or Television Film",
-#                "Best Actress – Television Series Drama",
-#                "Best Actress – Television Series Musical or Comedy",
-#                "Best Actress – Miniseries or Television Film",
-#                "Best Supporting Actor – Series,  Miniseries or Television Film",
-#                "Best Supporting Actress – Series, Miniseries or Television Film",
-#                "Carol Burnett Award for Lifetime Achievement in Television"]

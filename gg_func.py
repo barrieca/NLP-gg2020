@@ -61,19 +61,7 @@ def find_imdb_objects(df, search_type, year=0, n=1, is_movie=False, fuzzy_thresh
             break
     return results
 
-def get_hosts(df_tweets):
-    '''
-    Filters tweets containing 'host' to find, aggregates, and sorts names in the imdb database.
-    :param df_tweets:
-    :return:
-    '''
-    df_filtered_tweets = filter_tweets(df_tweets, 'host')
-    print(df_filtered_tweets)
-    df_filtered_tweets = get_noun_frequencies(create_noun_chunks(df_filtered_tweets))
-    print(df_filtered_tweets)
-    return find_truncated_candidates(df_filtered_tweets, 'name')
-
-def filter_tweets(df_tweets, regex_string):
+def filter_tweets(df_tweets, regex_string, invert=False):
     '''
     Filters the dataframe of tweet text to only include those that match the given regex_string.
     :param df_tweets: The dataframe containing the tweets' text
@@ -81,7 +69,9 @@ def filter_tweets(df_tweets, regex_string):
     :return:
     Example: noun_df = filter_tweets(pd.DataFrame(tweet_list, columns=['text']), 'movie|film|picture')
     '''
-    return df_tweets[df_tweets.text.str.contains(regex_string, regex=True)]
+
+    return df_tweets[~df_tweets.text.str.contains(regex_string, regex=True)] if invert\
+        else df_tweets[df_tweets.text.str.contains(regex_string, regex=True)]
 
 def filter_by_category(df_tweets, award_category):
     '''
@@ -157,7 +147,7 @@ def statistical_truncation(list_candidates, threshold_percent, min = 0):
     tup_list = [('John',500),('Jane',450),('Jim',400),('Jake',399),('Jesse',300)]
     statistical_truncation(tup_list,0.8) = ['John', 'Jane', 'Jim']
     '''
-    print(list_candidates)
+    # print(list_candidates)
     top_frequency = list_candidates[0][1]
     result_list = []
     for candidate in list_candidates:
@@ -174,37 +164,116 @@ def split_data_by_time(json_data, start_time):
     :param start_time: The start time of the Golden Globes in UTC datetime format.
     :return: Two dataframes of tweets (pre-show and non-pre-show) with desirable qualities.
     '''
-    df_tweets = pd.DataFrame(json_data)
 
-    df_tweets_after_start = df_tweets[pd.to_datetime(df_tweets['created_at']) >= start_time]
-    df_tweets_before_start = df_tweets[pd.to_datetime(df_tweets['created_at']) < start_time]
+    df_tweets = pd.DataFrame(json_data[0], columns=['text'])        # Indexing [0] will cause problems for 2020 data
 
-    return df_tweets_before_start[['text']], df_tweets_after_start[['text']]
+    if 'created_at' in df_tweets:
+        df_tweets_after_start = df_tweets[pd.to_datetime(df_tweets['created_at']) >= start_time]
+        df_tweets_before_start = df_tweets[pd.to_datetime(df_tweets['created_at']) < start_time]
+        return df_tweets_before_start[['text']], df_tweets_after_start[['text']]
+    else:
+        df_tweets_before_start = pd.DataFrame()
+        df_tweets_after_start = df_tweets[['text']]
+        return df_tweets_before_start, df_tweets_after_start
 
-def get_awards_helper(df_tweets):
+def get_hosts_helper(data_file_path):
+    '''
+    Filters tweets containing 'host' to find, aggregates, and sorts names in the imdb database.
+    :param data_file_path: Path to the JSON file of tweets.
+    :return:
+    '''
+    # print("finding host")
+    # Read in JSON data
+    json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
+
+    # Split data into two dataframes: pre-show and after show starts
+    pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
+
+    # Filter the tweets to find ones containing references to host
+    df_filtered_tweets = filter_tweets(data, 'host')
+    # df_filtered_tweets = filter_tweets(data, 'will ferrell')
+    # df_filtered_tweets = filter_tweets(df_filtered_tweets, 'next', True)
+    # print("filtered host tweets | " + str(df_filtered_tweets.size) + " remaining")
+
+    # Get the entities present in these tweets
+    df_filtered_tweets = get_noun_frequencies(create_noun_chunks(df_filtered_tweets))
+    # print('found possible host entities')
+
+    # Determine the most likely host
+    return find_truncated_candidates(df_filtered_tweets, 'name')
+
+def get_awards_helper(data_file_path):
+    '''
+
+    :param data_file_path: Path to the JSON file of tweets.
+    :return:
+    '''
+    # Read in JSON data
+    json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
+
+    # Split data into two dataframes: pre-show and after show starts
+    pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
+
     return []
 
-def get_nominees_helper(df_tweets):
-    return dict([(name, []) for name in award_names])
-
-def get_presenters_helper(df_tweets):
-    return dict([(name, []) for name in award_names])
-
-def get_winner_helper(df_tweets):
+def get_nominees_helper(data_file_path, award_names, awards_year):
     '''
-    Determines the winner for each award based on the given list of tweets.
-    :param pre_processed_tweet_list: A list of tweets that have been pre-filtered.
+
+    :param data_file_path: Path to the JSON file of tweets.
+    :param award_names: The award names for the current year.
+    :param awards_year: The year the Golden Globes were held.
+    :return:
+    '''
+
+    # Define some useful parameters for processing
+    award_entity_type = dict(map(entity_typer, award_names))
+
+    # Read in JSON data
+    json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
+
+    # Split data into two dataframes: pre-show and after show starts
+    pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
+
+    return dict([(name, []) for name in award_names])
+
+def get_presenters_helper(data_file_path, award_names):
+
+    # Define some useful parameters for processing
+    award_entity_type = dict(map(entity_typer, award_names))
+
+    # Read in JSON data
+    json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
+
+    # Split data into two dataframes: pre-show and after show starts
+    pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
+
+    return dict([(name, []) for name in award_names])
+
+def get_winner_helper(data_file_path, award_names, awards_year):
+    '''
+    Determines the winner for each award based on dataset of tweets.
+    :param data_file_path: Path to the JSON file of tweets.
+    :param award_names: The award names for the current year.
+    :param awards_year: The year the Golden Globes were held.
     :return: Dictionary containing 27 keys, with list as its value
     '''
+
+    # Define some useful parameters for processing
     num_possible_winner = 1
-    awards_year = 2020
     award_nominees = {}
+    award_entity_type = dict(map(entity_typer, award_names))
+
+    # Read in JSON data
+    json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
+
+    # Split data into two dataframes: pre-show and after show starts
+    pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
 
     # For each award category
     for category in award_names:
         t = time.time()
         # Filter tweets by subject string
-        df_nominee_tweets = filter_tweets(df_tweets, 'win|won|goes to|congratulations|congrats|congratz')
+        df_nominee_tweets = filter_tweets(data, 'win|won|goes to|congratulations|congrats|congratz')
 
         # Filter based on the award category
         df_nominee_tweets = filter_by_category(df_nominee_tweets, category)
@@ -220,7 +289,6 @@ def get_winner_helper(df_tweets):
         print("found noun frequencies")
 
         # Produce the correct number of noun chunks that also exist on IMDb
-
         imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], awards_year, num_possible_winner, award_entity_type[category] == 'movie')
         print("found imdb candidates")
 
@@ -258,52 +326,25 @@ def entity_typer(award_name):
     else:
         return (award_name, 'movie')
 
-award_names = [
-               'best motion picture - drama',
-               'best motion picture - musical or comedy',
-               'best performance by an actress in a motion picture - drama',
-               'best performance by an actor in a motion picture - drama',
-               'best performance by an actress in a motion picture - musical or comedy',
-               'best performance by an actor in a motion picture - musical or comedy',
-               'best performance by an actress in a supporting role in any motion picture',
-               'best performance by an actor in a supporting role in any motion picture',
-               'best director - motion picture',
-               'best screenplay - motion picture',
-               'best motion picture - animated',
-               'best motion picture - foreign language',
-               'best original score - motion picture',
-               'best original song - motion picture',
-               'best television series - drama',
-               'best television series - musical or comedy',
-               'best television limited series or motion picture made for television',
-               'best performance by an actress in a limited series or a motion picture made for television',
-               'best performance by an actor in a limited series or a motion picture made for television',
-               'best performance by an actress in a television series - drama',
-               'best performance by an actor in a television series - drama',
-               'best performance by an actress in a television series - musical or comedy',
-               'best performance by an actor in a television series - musical or comedy',
-               'best performance by an actress in a supporting role in a series, limited series or motion picture made for television',
-               'best performance by an actor in a supporting role in a series, limited series or motion picture made for television',
-               'cecil b. demille award']
-award_entity_type = dict(map(entity_typer, award_names))
 entity_type_to_imdb_type = {'person': 'name', 'tv': 'title', 'movie': 'title'}
 
 noun_chunk_stop_words = {'i', 'you', 'golden globe', 'golden globes', 'goldenglobes', 'congratulations', '#', 'the golden globes', 'a golden globe', 'the golden globe', 'he', 'she', 'me', 'who', 'they', 'it', 'golden globes 2020', 'goldenglobes2020', 'golden globe award', '#goldenglobes2020', 'globes', '@goldenglobes', 'golden globe awards', 'goldenglobe'}
 
-def main():
+# def main():
 
     # Read in JSON data
-    data = [json.loads(line) for line in open('gg2020.json','r',encoding='utf-8')]
+    # data = [json.loads(line) for line in open('gg2020.json','r',encoding='utf-8')]
+    # print(type(data[0]))
+    # # Split data into two dataframes: pre-show and after show starts
+    # pre_data, data = split_data_by_time(data, pd.to_datetime('2020-01-06T01:00:00'))
+    #
+    # print(get_hosts_helper(data))
 
-    # Split data into two dataframes: pre-show and after show starts
-    pre_data, data = split_data_by_time(data, pd.to_datetime('2020-01-06T01:00:00'))
-
-    print(get_hosts(data))
-    #print(get_winner(data))
-    # print(filter_tweets(data, 'present').size)
-    print(get_presenters(data))
+#     #print(get_winner(data))
+#     # print(filter_tweets(data, 'present').size)
+#     print(get_presenters_helper(data))
 
 
-t = time.time()
-main()
-print(time.time()-t)
+# t = time.time()
+# main()
+# print(time.time()-t)

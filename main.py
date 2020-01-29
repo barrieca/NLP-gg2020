@@ -28,7 +28,7 @@ def find_imdb_objects(df, search_type, n=1):
     search_function = (imdb_obj.search_person if search_type == 'name' else imdb_obj.search_movie)
     results = []
     for i, row in df.iterrows():
-        noun = row['text']
+        noun = row['noun_chunks'].text
         result = search_function(noun)
         if len(result) > 0 and result[0][search_type] == noun:
             results.append((noun,row['freq']))
@@ -76,6 +76,9 @@ def filter_tweets(df_tweets, regex_string):
     '''
     return df_tweets[df_tweets.text.str.contains(regex_string, regex=True)]
 
+def test_noun_chunks(column_tweets):
+    nlp = spacy.load('en_core_web_sm')
+    return [*nlp(column_tweets)]
 
 def create_noun_chunks(df_tweet):
     '''
@@ -83,16 +86,31 @@ def create_noun_chunks(df_tweet):
     :param df_tweet: A dataframe of tweets with the column 'text'.
     :return: Returns a dataframe of the noun chunks in the tweet text.
     '''
-    # Instantiate spacy
-    nlp = spacy.load('en_core_web_sm')
+    # new_t = time.time()
+    # # Instantiate spacy
+    # nlp = spacy.load('en_core_web_sm')
+    #
+    # # Apply the noun chunking to the remaining text
+    # df_tweet['noun_chunks'] = df_tweet.apply(lambda row: [*nlp(row['text']).noun_chunks], axis=1)
+    #
+    # newDF = build_noun_chunk_list(df_tweet)
+    # print(time.time()-new_t)
+    #
+    # return newDF
 
-    # Apply the noun chunking to the remaining text
-    test_func = lambda x: [*nlp(x).noun_chunks]
-    # df_tweet = df_tweet.apply(lambda x: [*nlp(x).noun_chunks], axis=1)
-    print(df_tweet.values)
-    df_noun_chunks = pd.DataFrame()
-    df_noun_chunks['text'] = test_func(df_tweet['text'].values)
-    return df_tweet
+    df_test = filter_tweets(df_tweet, "movie|film|picture")
+    new_t = time.time()
+    nlp = spacy.load('en_core_web_sm')
+    noun_chunks = []
+    for i, row in df_test.iterrows():
+        noun_chunks += [*nlp(row['text']).noun_chunks]
+    print(time.time()-new_t)
+    return pd.DataFrame(noun_chunks, columns=['noun_chunks'])
+
+def build_noun_chunk_list(df_tweet):
+    values = df_tweet['noun_chunks'].values.flatten()
+    return pd.DataFrame(values)
+
 
 
 def get_noun_frequencies(df_nouns):
@@ -101,7 +119,7 @@ def get_noun_frequencies(df_nouns):
     :param df_nouns:
     :return:
     '''
-    df_nouns['freq'] = df_nouns.groupby('text')['text'].transform('count')
+    df_nouns['freq'] = df_nouns.groupby(['noun_chunks'])['noun_chunks'].transform('count')
     return df_nouns.drop_duplicates().sort_values(by='freq', ascending=False)
 
 def statistical_truncation(list_candidates, threshold_percent, min = 0):

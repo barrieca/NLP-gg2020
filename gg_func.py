@@ -181,16 +181,16 @@ def split_data_by_time(json_data, start_time):
 
     return df_tweets_before_start[['text']], df_tweets_after_start[['text']]
 
-def get_awards(df_tweets):
+def get_awards_helper(df_tweets):
     return []
 
-def get_nominees(df_tweets):
+def get_nominees_helper(df_tweets):
     return dict([(name, []) for name in award_names])
 
-def get_presenters(df_tweets):
+def get_presenters_helper(df_tweets):
     return dict([(name, []) for name in award_names])
 
-def get_winner(df_tweets):
+def get_winner_helper(df_tweets):
     '''
     Determines the winner for each award based on the given list of tweets.
     :param pre_processed_tweet_list: A list of tweets that have been pre-filtered.

@@ -14,7 +14,7 @@ def find_truncated_candidates(df, search_type, min=1):
     :param min: The number of candidates (default is 1).
     :return: The list of candidates.
     '''
-    return statistical_truncation(find_imdb_objects(df, search_type, min), 0.7, min)
+    return statistical_truncation(find_imdb_objects(df, search_type, min), 0.5, min)
 
 def is_valid_movie_year(test_year, award_year):
     return test_year != '????' and int(test_year) >= int(award_year)-2 and int(test_year) < int(award_year)
@@ -22,7 +22,7 @@ def is_valid_movie_year(test_year, award_year):
 def is_valid_series_year(test_year, award_year):
     return test_year != '????' and int(test_year) >= int(award_year)-15 and int(test_year) < int(award_year)
 
-def find_imdb_objects(df, search_type, year=0, n=1, is_movie=False, fuzzy_threshold=0.25):
+def find_imdb_objects(df, search_type, n=1, year=0, is_movie=False, fuzzy_threshold=0.25):
     '''
     Returns list of tuples of n noun chunks that were successfully found on IMDb, and their frequency.
     :param df: DataFrame of sorted nouns
@@ -70,9 +70,8 @@ def filter_tweets(df_tweets, regex_string, invert=False):
     Example: noun_df = filter_tweets(pd.DataFrame(tweet_list, columns=['text']), 'movie|film|picture')
     '''
 
-    # return df_tweets[~df_tweets.text.str.contains(regex_string, regex=True)] if invert\
-    #     else df_tweets[df_tweets.text.str.contains(regex_string, regex=True)]
-    return df_tweets[df_tweets.text.str.contains(regex_string, regex=True)]
+    return df_tweets[~df_tweets.text.str.contains(regex_string, regex=True)] if invert\
+        else df_tweets[df_tweets.text.str.contains(regex_string, regex=True)]
 
 def filter_by_category(df_tweets, award_category):
     '''
@@ -206,7 +205,8 @@ def get_hosts_helper(data_file_path):
 
     # Filter the tweets to find ones containing references to host
     df_filtered_tweets = filter_tweets(data, 'host')
-    # df_filtered_tweets = filter_tweets(data, 'will ferrell')
+    df_filtered_tweets = filter_tweets(df_filtered_tweets, 'next', True)
+    max_hosts = 2
     # df_filtered_tweets = filter_tweets(df_filtered_tweets, 'next', True)
     # print("filtered host tweets | " + str(df_filtered_tweets.size) + " remaining")
 
@@ -214,8 +214,8 @@ def get_hosts_helper(data_file_path):
     df_filtered_tweets = get_noun_frequencies(create_noun_chunks(df_filtered_tweets))
     # print('found possible host entities')
 
-    # Determine the most likely host
-    return find_truncated_candidates(df_filtered_tweets, 'name')
+    # Determine the most likely host, max 2 hosts
+    return find_truncated_candidates(df_filtered_tweets, 'name', max_hosts)
 
 def get_awards_helper(data_file_path):
     '''
@@ -254,9 +254,9 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
     t = time.time()
 
     # For each award category
-    # for category in award_names:
-    for i in range(0,1):
-        category = award_names[2]
+    for category in award_names:
+    # for i in range(0,1):
+        # category = award_names[2]
 
         # Filter tweets by subject string
         df_nominee_tweets = filter_tweets(data, 'nomin|should|wish|win|won|goes to|not win|nod|sad|pain|down')
@@ -275,7 +275,7 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
         # print("found noun frequencies")
 
         # Produce the correct number of noun chunks that also exist on IMDb
-        imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], awards_year, num_possible_winner, award_entity_type[category] == 'movie')
+        imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], num_possible_winner, awards_year, award_entity_type[category] == 'movie')
         # print("found imdb candidates")
 
         # Store winner
@@ -341,7 +341,7 @@ def get_winner_helper(data_file_path, award_names, awards_year):
         # print("found noun frequencies")
 
         # Produce the correct number of noun chunks that also exist on IMDb
-        imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], awards_year, num_possible_winner, award_entity_type[category] == 'movie')
+        imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], num_possible_winner, awards_year, award_entity_type[category] == 'movie')
         # print("found imdb candidates")
 
         # Store winner

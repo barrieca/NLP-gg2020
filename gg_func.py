@@ -14,15 +14,15 @@ def find_truncated_candidates(df, search_type, min=1):
     :param min: The number of candidates (default is 1).
     :return: The list of candidates.
     '''
-    return statistical_truncation(find_imdb_objects(df, search_type, min), 0.7, min)
+    return statistical_truncation(find_imdb_objects(df, search_type, min), 0.5, min)
 
 def is_valid_movie_year(test_year, award_year):
-    return test_year != '????' and test_year >= award_year-2 and test_year < award_year
+    return test_year != '????' and int(test_year) >= int(award_year)-2 and int(test_year) < int(award_year)
 
 def is_valid_series_year(test_year, award_year):
-    return test_year != '????' and test_year >= award_year-15 and test_year < award_year
+    return test_year != '????' and int(test_year) >= int(award_year)-15 and int(test_year) < int(award_year)
 
-def find_imdb_objects(df, search_type, year=0, n=1, is_movie=False, fuzzy_threshold=0.25):
+def find_imdb_objects(df, search_type, n=1, year=0, is_movie=False, fuzzy_threshold=0.25):
     '''
     Returns list of tuples of n noun chunks that were successfully found on IMDb, and their frequency.
     :param df: DataFrame of sorted nouns
@@ -191,7 +191,8 @@ def get_hosts_helper(data_file_path):
 
     # Filter the tweets to find ones containing references to host
     df_filtered_tweets = filter_tweets(data, 'host')
-    # df_filtered_tweets = filter_tweets(data, 'will ferrell')
+    df_filtered_tweets = filter_tweets(df_filtered_tweets, 'next year', True)
+    max_hosts = 2
     # df_filtered_tweets = filter_tweets(df_filtered_tweets, 'next', True)
     # print("filtered host tweets | " + str(df_filtered_tweets.size) + " remaining")
 
@@ -199,8 +200,8 @@ def get_hosts_helper(data_file_path):
     df_filtered_tweets = get_noun_frequencies(create_noun_chunks(df_filtered_tweets))
     # print('found possible host entities')
 
-    # Determine the most likely host
-    return find_truncated_candidates(df_filtered_tweets, 'name')
+    # Determine the most likely host, max 2 hosts
+    return find_truncated_candidates(df_filtered_tweets, 'name', max_hosts)
 
 def get_awards_helper(data_file_path):
     '''
@@ -289,7 +290,7 @@ def get_winner_helper(data_file_path, award_names, awards_year):
         print("found noun frequencies")
 
         # Produce the correct number of noun chunks that also exist on IMDb
-        imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], awards_year, num_possible_winner, award_entity_type[category] == 'movie')
+        imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], num_possible_winner, awards_year, award_entity_type[category] == 'movie')
         print("found imdb candidates")
 
         # Store winner

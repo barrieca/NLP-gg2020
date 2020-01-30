@@ -17,10 +17,10 @@ def find_truncated_candidates(df, search_type, min=1):
     return statistical_truncation(find_imdb_objects(df, search_type, min), 0.7, min)
 
 def is_valid_movie_year(test_year, award_year):
-    return test_year != '????' and test_year >= award_year-2 and test_year < award_year
+    return test_year != '????' and int(test_year) >= int(award_year)-2 and int(test_year) < int(award_year)
 
 def is_valid_series_year(test_year, award_year):
-    return test_year != '????' and test_year >= award_year-15 and test_year < award_year
+    return test_year != '????' and int(test_year) >= int(award_year)-15 and int(test_year) < int(award_year)
 
 def find_imdb_objects(df, search_type, year=0, n=1, is_movie=False, fuzzy_threshold=0.25):
     '''
@@ -70,8 +70,9 @@ def filter_tweets(df_tweets, regex_string, invert=False):
     Example: noun_df = filter_tweets(pd.DataFrame(tweet_list, columns=['text']), 'movie|film|picture')
     '''
 
-    return df_tweets[~df_tweets.text.str.contains(regex_string, regex=True)] if invert\
-        else df_tweets[df_tweets.text.str.contains(regex_string, regex=True)]
+    # return df_tweets[~df_tweets.text.str.contains(regex_string, regex=True)] if invert\
+    #     else df_tweets[df_tweets.text.str.contains(regex_string, regex=True)]
+    return df_tweets[df_tweets.text.str.contains(regex_string, regex=True)]
 
 def filter_by_category(df_tweets, award_category):
     '''
@@ -100,7 +101,21 @@ def filter_by_category(df_tweets, award_category):
     if 'support' in award_category:
         df_filtered_tweets = filter_tweets(df_filtered_tweets, 'support')
     if 'director' in award_category:
-        df_filtered_tweets= filter_tweets(df_filtered_tweets, 'direct')
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'direct')
+    if 'cecil' in award_category:
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'cecil')
+    if 'carol' in award_category:
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'carol')
+    if 'animate' in award_category:
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'animate')
+    if 'foreign' in award_category:
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'foreign|language')
+    if 'screenplay' in award_category:
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'screen|write')
+    if 'score' in award_category:
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'score')
+    if 'song' in award_category:
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'song')
 
     return df_filtered_tweets
 
@@ -218,14 +233,16 @@ def get_awards_helper(data_file_path):
 
 def get_nominees_helper(data_file_path, award_names, awards_year):
     '''
-
+    Determines the winner for each award based on dataset of tweets.
     :param data_file_path: Path to the JSON file of tweets.
     :param award_names: The award names for the current year.
     :param awards_year: The year the Golden Globes were held.
-    :return:
+    :return: A dictionary with the hard coded award names as keys, and each entry a list of strings denoting nominees.
     '''
 
     # Define some useful parameters for processing
+    num_possible_winner = 5
+    award_nominees = {}
     award_entity_type = dict(map(entity_typer, award_names))
 
     # Read in JSON data
@@ -234,7 +251,42 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
     # Split data into two dataframes: pre-show and after show starts
     pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
 
-    return dict([(name, []) for name in award_names])
+    t = time.time()
+
+    # For each award category
+    # for category in award_names:
+    for i in range(0,1):
+        category = award_names[2]
+
+        # Filter tweets by subject string
+        df_nominee_tweets = filter_tweets(data, 'nomin|should|wish|win|won|goes to|not win|nod|sad|pain|down')
+
+        # Filter based on the award category
+        df_nominee_tweets = filter_by_category(df_nominee_tweets, category)
+
+        print("filtered nominee tweets | " + str(df_nominee_tweets.size))
+
+        # Get the nouns chunks in the remaining tweets
+        df_noun_chunks = create_noun_chunks(df_nominee_tweets)
+        # print("found noun chunks")
+
+        # Aggregate and sort the noun chunks
+        df_sorted_nouns = get_noun_frequencies(df_noun_chunks)
+        # print("found noun frequencies")
+
+        # Produce the correct number of noun chunks that also exist on IMDb
+        imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], awards_year, num_possible_winner, award_entity_type[category] == 'movie')
+        # print("found imdb candidates")
+
+        # Store winner
+        award_nominees[category] = [nominee[0] for nominee in imdb_candidates[:num_possible_winner]]
+        # print("found the award winner")
+
+    print(award_nominees)
+    print(t - time.time())
+    return award_nominees
+
+    # return dict([(name, []) for name in award_names])
 
 def get_presenters_helper(data_file_path, award_names):
 
@@ -260,7 +312,7 @@ def get_winner_helper(data_file_path, award_names, awards_year):
 
     # Define some useful parameters for processing
     num_possible_winner = 1
-    award_nominees = {}
+    award_winners = {}
     award_entity_type = dict(map(entity_typer, award_names))
 
     # Read in JSON data
@@ -271,33 +323,33 @@ def get_winner_helper(data_file_path, award_names, awards_year):
 
     # For each award category
     for category in award_names:
-        t = time.time()
+        # t = time.time()
         # Filter tweets by subject string
         df_nominee_tweets = filter_tweets(data, 'win|won|goes to|congratulations|congrats|congratz')
 
         # Filter based on the award category
         df_nominee_tweets = filter_by_category(df_nominee_tweets, category)
 
-        print("filtered nominee tweets | " + str(df_nominee_tweets.size))
+        print("filtered winner tweets | " + str(df_nominee_tweets.size))
 
         # Get the nouns chunks in the remaining tweets
         df_noun_chunks = create_noun_chunks(df_nominee_tweets)
-        print("found noun chunks")
+        # print("found noun chunks")
 
         # Aggregate and sort the noun chunks
         df_sorted_nouns = get_noun_frequencies(df_noun_chunks)
-        print("found noun frequencies")
+        # print("found noun frequencies")
 
         # Produce the correct number of noun chunks that also exist on IMDb
         imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], awards_year, num_possible_winner, award_entity_type[category] == 'movie')
-        print("found imdb candidates")
+        # print("found imdb candidates")
 
         # Store winner
-        award_nominees[category] = imdb_candidates[0][0]
-        print("found the award winner")
-        print(t-time.time())
+        award_winners[category] = imdb_candidates[0][0]
+        # print("found the award winner")
+        # print(t-time.time())
 
-    return award_nominees
+    return award_winners
 
 def fuzzy_match(s1, s2, threshold=0.25):
     '''
@@ -320,7 +372,7 @@ def entity_typer(award_name):
     if 'actor' in award_name or 'actress' in award_name or 'director' in award_name or 'carol' in award_name or 'cecil' in award_name:
         return (award_name, 'person')
     elif 'song' in award_name:
-        return (award_name, 'song')
+        return (award_name, 'movie') # this should probably be song
     elif 'series' in award_name:
         return (award_name, 'tv')
     else:

@@ -4,4 +4,4 @@ gg2015.json
 .idea/
 NLP-gg2020.iml
 *.swp
-
+__pycache__/*

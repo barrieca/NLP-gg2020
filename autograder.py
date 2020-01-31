@@ -223,7 +223,8 @@ def main(years, grading):
 
 if __name__ == '__main__':
     # years = ['2013', '2015']
-    grading = ["hosts"]#, "awards", "nominees", "presenters", "winner"]
+    # grading = ["hosts", "awards", "nominees", "presenters", "winner"]
+    grading = ["nominees"]
     years = ['2013']
     # grading = ["hosts"]
 

@@ -38,26 +38,27 @@ def find_imdb_objects(df, search_type, n=1, year=0, is_movie=False, fuzzy_thresh
     for i, row in df.iterrows():
         noun = row['text']
         result = search_function(noun)
-        if search_type == 'title':
-            if is_movie:
-                imdb_candidates = [object['long imdb title'][:-7] for object in result if object['kind'] == 'movie' and
-                                   'year' in object and
-                                   is_valid_movie_year(object['year'], year)]
-                if len(imdb_candidates) > 0:
-                    for candidate in imdb_candidates:
-                        if fuzzy_match(candidate.lower(), noun, fuzzy_threshold):
-                            results.append((candidate,row['freq']))
+        if not any(possible[search_type] in results_elt for results_elt in results for possible in result): # get rid of duplicates
+            if search_type == 'title':
+                if is_movie:
+                    imdb_candidates = [object['long imdb title'][:-7] for object in result if object['kind'] == 'movie' and
+                                       'year' in object and
+                                       is_valid_movie_year(object['year'], year)]
+                    if len(imdb_candidates) > 0:
+                        for candidate in imdb_candidates:
+                            if fuzzy_match(candidate.lower(), noun, fuzzy_threshold):
+                                results.append((candidate,row['freq']))
+                else:
+                    imdb_candidates = [object['title'] for object in result if (object['kind'] == 'tv series' or object['kind'] == 'tv mini series' or object['kind'] == 'tv movie') and
+                                       'year' in object and
+                                       is_valid_series_year(object['year'], year)]
+                    if len(imdb_candidates) > 0:
+                        for candidate in imdb_candidates:
+                            if fuzzy_match(candidate.lower(), noun, fuzzy_threshold):
+                                results.append((candidate, row['freq']))
             else:
-                imdb_candidates = [object['title'] for object in result if (object['kind'] == 'tv series' or object['kind'] == 'tv mini series' or object['kind'] == 'tv movie') and
-                                   'year' in object and
-                                   is_valid_series_year(object['year'], year)]
-                if len(imdb_candidates) > 0:
-                    for candidate in imdb_candidates:
-                        if fuzzy_match(candidate.lower(), noun, fuzzy_threshold):
-                            results.append((candidate, row['freq']))
-        else:
-            if len(result) > 0 and fuzzy_match(result[0][search_type], noun, fuzzy_threshold):
-                results.append((result[0][search_type], row['freq']))
+                if len(result) > 0 and fuzzy_match(result[0][search_type], noun, fuzzy_threshold):
+                    results.append((result[0][search_type], row['freq']))
         if len(results) >= n:
             break
     return results
@@ -195,7 +196,7 @@ def get_noun_frequencies(df_nouns):
     df_nouns['freq'] = df_nouns.groupby('text')['text'].transform('count')
     return df_nouns.drop_duplicates().sort_values(by='freq', ascending=False)
 
-def statistical_truncation(list_candidates, threshold_percent, min = 0):
+def statistical_truncation(list_candidates, threshold_percent=0.6, min = 0):
     '''
     :param list_candidates:
     :param threshold_percent:
@@ -206,14 +207,17 @@ def statistical_truncation(list_candidates, threshold_percent, min = 0):
     statistical_truncation(tup_list,0.8) = ['John', 'Jane', 'Jim']
     '''
     # print(list_candidates)
-    top_frequency = list_candidates[0][1]
-    result_list = []
-    for candidate in list_candidates:
-        if candidate[1] < top_frequency * threshold_percent and len(result_list) >= min:
-            break
-        else:
-            result_list.append(candidate[0])
-    return result_list
+    try:
+        top_frequency = list_candidates[0][1]
+        result_list = []
+        for candidate in list_candidates:
+            if candidate[1] < top_frequency * threshold_percent and len(result_list) >= min:
+                break
+            else:
+                result_list.append(candidate[0])
+        return result_list
+    except:
+        return []
 
 def split_data_by_time(json_data, start_time):
     '''
@@ -306,11 +310,8 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
 
     # For each award category
     for category in award_names:
-    # for i in range(0,1):
-        # category = award_names[2]
-
         # Filter tweets by subject string
-        df_nominee_tweets = filter_tweets(data, 'nomin|should|wish|win|won|goes to|not win|nod|sad|pain|down')
+        df_nominee_tweets = filter_tweets(data, 'nomin|should|wish|win|won|goes to|not win|nod|sad|pain|down|hope|rob|snub')
 
         # Filter based on the award category
         df_nominee_tweets = filter_by_category(df_nominee_tweets, category)
@@ -330,18 +331,25 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
         # print("found imdb candidates")
 
         # Store winner
-        award_nominees[category] = [nominee[0] for nominee in imdb_candidates[:num_possible_winner]]
+        award_nominees[category] = [nominee[0] for nominee in imdb_candidates[0:num_possible_winner]]
         # print("found the award winner")
 
     print(award_nominees)
     print(t - time.time())
     return award_nominees
 
-    # return dict([(name, []) for name in award_names])
-
 def get_presenters_helper(data_file_path, award_names):
+    '''
+    Determines the winner for each award based on dataset of tweets.
+    :param data_file_path: Path to the JSON file of tweets.
+    :param award_names: The award names for the current year.
+    :param awards_year: The year the Golden Globes were held.
+    :return: A dictionary with the hard coded award names as keys, and each entry a list of strings denoting nominees.
+    '''
 
     # Define some useful parameters for processing
+    num_possible_presenters = 2
+    award_presenters = {}
     award_entity_type = dict(map(entity_typer, award_names))
 
     # Read in JSON data
@@ -350,7 +358,37 @@ def get_presenters_helper(data_file_path, award_names):
     # Split data into two dataframes: pre-show and after show starts
     pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
 
-    return dict([(name, []) for name in award_names])
+    t = time.time()
+
+    # For each award category
+    for category in award_names:
+        # Filter tweets by subject string
+        df_nominee_tweets = filter_tweets(data, 'present|giv|hand|introduc')
+
+        # Filter based on the award category
+        df_nominee_tweets = filter_by_category(df_nominee_tweets, category)
+
+        print("filtered presenter tweets | " + str(df_nominee_tweets.size))
+
+        # Get the nouns chunks in the remaining tweets
+        df_noun_chunks = create_noun_chunks(df_nominee_tweets)
+        # print("found noun chunks")
+
+        # Aggregate and sort the noun chunks
+        df_sorted_nouns = get_noun_frequencies(df_noun_chunks)
+        # print("found noun frequencies")
+
+        # Produce the correct number of noun chunks that also exist on IMDb
+        imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], num_possible_presenters)
+        # print("found imdb candidates")
+
+        # Store winner
+        award_presenters[category] = statistical_truncation(imdb_candidates, 0.6, 1)
+        # print("found the award presenters")
+
+    print(award_presenters)
+    print(t - time.time())
+    return award_presenters
 
 def get_winner_helper(data_file_path, award_names, awards_year):
     '''

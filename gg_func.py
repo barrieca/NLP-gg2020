@@ -5,6 +5,7 @@ import imdb
 import itertools
 import Levenshtein
 import pandas as pd
+import re
 
 def find_truncated_candidates(df, search_type, min=1):
     '''
@@ -142,6 +143,49 @@ def create_noun_chunks(df_tweet):
 
     return df_noun_chunks
 
+def trimend(string, pattern):
+    idx = re.search(pattern, string)
+    if idx:
+        string = string[0:idx.start()]
+    return string
+
+def fuzzy_group(df_phrases, truncate_at):
+    phrase_list = []
+    for i, row in df_phrases.iterrows():
+        if len(phrase_list) >= truncate_at:
+            break
+        # (row['text'] = trimend(row['text'], x)) for x in [' for', ' goes to']
+        row['text'] = trimend(row['text'], ' for( |$)')
+        row['text'] = trimend(row['text'], ' goes to')
+        row['text'] = trimend(row['text'], ' in$')
+        row['text'] = trimend(row['text'], ' at the')
+        already_in_list = False
+        for j in range(len(phrase_list)):
+            if phrase_list[j].startswith(row['text']):
+                already_in_list = True
+                break
+            elif row['text'].startswith(phrase_list[j]):
+                phrase_list[j] = row['text']
+                already_in_list = True
+                break
+        if not already_in_list and row['text']:
+            phrase_list.append(row['text'])
+    return phrase_list
+
+def search_for_awards(df_tweets):
+
+    # g1 = df_tweets['text'].str.extract(r'(?:wins|won) (best [\w ,-]+) (?:for|[!#])', re.IGNORECASE).dropna()
+    # g2 = df_tweets['text'].str.extract(r'(?:wins|won)[\w ]*golden ?globe[\w ]* (?:for|[!#]) (best [\w ,-]+)', re.IGNORECASE).dropna() # this may not work well
+    # g3 = df_tweets['text'].str.extract(r'winner of (best [^!#]+) is', re.IGNORECASE).dropna() # this may not work well
+    # g4 = df_tweets['text'].str.extract(r'present(?:s|ed) (best [\w ,-]+)', re.IGNORECASE).dropna()
+    # g4 = df_tweets['text'].str.extract(r'presents (best [\w ,-]+)', re.IGNORECASE).dropna()
+    # g4 = df_tweets['text'].str.extract(r'presented (best [\w ,-]+)', re.IGNORECASE).dropna()
+    # g5 = df_tweets['text'].str.extract(r' ?(best [\w ,-]+) goes to', re.IGNORECASE).dropna()
+
+    # phrases = pd.concat([g1, g2, g3, g4, g5])
+    phrases = df_tweets['text'].str.extract(r'for (best [\w ,-]+) (?:for|[!#])', re.IGNORECASE).dropna()
+    phrases = phrases[~phrases[0].str.contains('golden ?globe', case=False, regex=True)]
+    return pd.DataFrame([candidate.lower() for candidate in phrases[0]], columns=['text'])
 
 def get_noun_frequencies(df_nouns):
     '''
@@ -230,10 +274,17 @@ def get_awards_helper(data_file_path):
     # Read in JSON data
     json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
 
-    # Split data into two dataframes: pre-show and after show starts
-    pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
+    df_tweets = pd.DataFrame(json_data[0], columns=['text'])
 
-    return []
+    df_nominee_tweets = filter_tweets(df_tweets, 'win|won|goes to|congratulations|congrats|congratz')
+
+    df_candidates = search_for_awards(df_nominee_tweets)
+
+    # df_noun_chunks = create_noun_chunks(df_nominee_tweets)
+    df_sorted_nouns = get_noun_frequencies(df_candidates)
+    phrases = fuzzy_group(df_sorted_nouns, 27)
+    # temp = df_sorted_nouns['text'][0:27]
+    return phrases
 
 def get_nominees_helper(data_file_path, award_names, awards_year):
     '''

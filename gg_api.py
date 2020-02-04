@@ -82,7 +82,11 @@ def main():
     and then run gg_api.main(). This is the second thing the TA will
     run when grading. Do NOT change the name of this function or
     what it returns.'''
-    # Your code here
+
+    get_winner(2013)
+    # Sentiment Analysis - probably a better place to put this stuff
+    sentiment = gg.sentiment_analysis('gg' + str(2013) + '.json')
+
     return
 
 if __name__ == '__main__':

@@ -6,6 +6,9 @@ import itertools
 import Levenshtein
 import pandas as pd
 import re
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+
+the_winners = {}
 
 def find_truncated_candidates(df, search_type, min=1):
     '''
@@ -186,6 +189,21 @@ def search_for_awards(df_tweets):
     phrases = df_tweets['text'].str.extract(r'for (best [\w ,-]+) (?:for|[!#])', re.IGNORECASE).dropna()
     phrases = phrases[~phrases[0].str.contains('golden ?globe', case=False, regex=True)]
     return pd.DataFrame([candidate.lower() for candidate in phrases[0]], columns=['text'])
+
+def sentiment_analysis(data_file_path):
+    json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
+
+    df_tweets = pd.DataFrame(json_data[0], columns=['text'])
+    if len(the_winners) == 0:
+        return {}
+    winners = the_winners.values()
+    analyzer = SentimentIntensityAnalyzer()
+    sentiment = {}
+    for winner in winners:
+        winner_tweets = filter_tweets(df_tweets, winner)['text']
+        sentiment[winner] = sum(analyzer.polarity_scores(tweet)['compound'] for tweet in winner_tweets) / len(winner_tweets)
+
+    return sentiment
 
 def get_noun_frequencies(df_nouns):
     '''
@@ -399,6 +417,9 @@ def get_winner_helper(data_file_path, award_names, awards_year):
     :return: Dictionary containing 27 keys, with list as its value
     '''
 
+    # winners global (for use by other functions)
+    global the_winners
+
     # Define some useful parameters for processing
     num_possible_winner = 1
     award_winners = {}
@@ -437,6 +458,7 @@ def get_winner_helper(data_file_path, award_names, awards_year):
         award_winners[category] = imdb_candidates[0][0]
         # print("found the award winner")
         # print(t-time.time())
+    the_winners = award_winners
 
     return award_winners
 

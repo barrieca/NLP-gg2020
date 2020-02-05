@@ -85,7 +85,7 @@ def main():
 
     get_winner(2013)
     # Sentiment Analysis - probably a better place to put this stuff
-    sentiment = gg.sentiment_analysis('gg' + str(2013) + '.json')
+    print(gg.sentiment_analysis_helper('gg' + str(2013) + '.json'))
 
     return
 

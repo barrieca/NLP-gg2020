@@ -1,11 +1,13 @@
-import json
-import spacy
-import time
+#from collections import Counter
+import collections
 import imdb
 import itertools
+import json
 import Levenshtein
 import pandas as pd
 import re
+import spacy
+import time
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 the_winners = {}
@@ -190,19 +192,44 @@ def search_for_awards(df_tweets):
     phrases = phrases[~phrases[0].str.contains('golden ?globe', case=False, regex=True)]
     return pd.DataFrame([candidate.lower() for candidate in phrases[0]], columns=['text'])
 
-def sentiment_analysis(data_file_path):
+def sentiment_analysis_helper(data_file_path):
+    '''
+    Function calleb by gg_api for analyzing sentiment.
+    :param data_file_path: Path to the JSON file of tweets.
+    :return: Dictionary of people and the analyzed sentiment scores with respect to each person.
+    '''
+
     json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
 
     df_tweets = pd.DataFrame(json_data[0], columns=['text'])
+
     if len(the_winners) == 0:
         return {}
     winners = the_winners.values()
+
+    sentiment = sentiment_analysis(df_tweets, winners)
+    sentiment = {subject: sentiment[subject]['compound'] for subject in sentiment.keys()}
+
+    return sentiment
+
+def sentiment_analysis(df_tweets, subjects):
+    '''
+    Determines the winner for each award based on dataset of tweets.
+    :param df_tweets: Pandas dataframe of tweets.
+    :param subjects: List of subjects (people, movies, etc.) about which to analyze sentiment.
+    :return: Dictionary of people and the analyzed sentiment scores with respect to each person.
+    '''
     analyzer = SentimentIntensityAnalyzer()
     sentiment = {}
-    for winner in winners:
-        winner_tweets = filter_tweets(df_tweets, winner)['text']
-        sentiment[winner] = sum(analyzer.polarity_scores(tweet)['compound'] for tweet in winner_tweets) / len(winner_tweets)
-
+    for subject in subjects:
+        subject_tweets = filter_tweets(df_tweets, subject)['text']
+        sentiment_counter = collections.Counter()
+        # sentiment_counter.update(analyzer.polarity_scores(tweet)) for tweet in subject_tweets / len(subject_tweets)
+        for tweet in subject_tweets:
+            sentiment_counter.update(analyzer.polarity_scores(tweet))
+        sentiment[subject] = dict(sentiment_counter)
+        for score_type in sentiment[subject].keys():
+            sentiment[subject][score_type] /= len(subject_tweets)
     return sentiment
 
 def get_noun_frequencies(df_nouns):
@@ -285,7 +312,7 @@ def get_hosts_helper(data_file_path):
 
 def get_awards_helper(data_file_path):
     '''
-
+    Attempts to find all of the award types using the given tweets.
     :param data_file_path: Path to the JSON file of tweets.
     :return:
     '''

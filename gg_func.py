@@ -207,14 +207,14 @@ def sentiment_analysis_helper(data_file_path):
         return {}
     winners = the_winners.values()
 
-    sentiment = sentiment_analysis(df_tweets, winners)
+    sentiment = get_sentiment_scores(df_tweets, winners)
     sentiment = {subject: sentiment[subject]['compound'] for subject in sentiment.keys()}
 
     return sentiment
 
-def sentiment_analysis(df_tweets, subjects):
+def get_sentiment_scores(df_tweets, subjects):
     '''
-    Determines the winner for each award based on dataset of tweets.
+    Calculates a set of sentiment scores based on dataset of tweets.
     :param df_tweets: Pandas dataframe of tweets.
     :param subjects: List of subjects (people, movies, etc.) about which to analyze sentiment.
     :return: Dictionary of people and the analyzed sentiment scores with respect to each person.

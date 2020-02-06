@@ -1,10 +1,15 @@
-import json
-import spacy
-import time
+#from collections import Counter
+import collections
 import imdb
 import itertools
+import json
 import Levenshtein
+import os
 import pandas as pd
+import re
+import spacy
+import time
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 def find_truncated_candidates(df, search_type, min=1):
     '''
@@ -140,6 +145,107 @@ def create_noun_chunks(df_tweet):
 
     return df_noun_chunks
 
+def trimend(string, pattern):
+    idx = re.search(pattern, string)
+    if idx:
+        string = string[0:idx.start()]
+    return string
+
+def fuzzy_group(df_phrases, truncate_at):
+    phrase_list = []
+    for i, row in df_phrases.iterrows():
+        if len(phrase_list) >= truncate_at:
+            break
+        # (row['text'] = trimend(row['text'], x)) for x in [' for', ' goes to']
+        row['text'] = trimend(row['text'], ' for( |$)')
+        row['text'] = trimend(row['text'], ' goes to')
+        row['text'] = trimend(row['text'], ' in$')
+        row['text'] = trimend(row['text'], ' at the')
+        already_in_list = False
+        for j in range(len(phrase_list)):
+            if phrase_list[j].startswith(row['text']):
+                already_in_list = True
+                break
+            elif row['text'].startswith(phrase_list[j]):
+                phrase_list[j] = row['text']
+                already_in_list = True
+                break
+        if not already_in_list and row['text']:
+            phrase_list.append(row['text'])
+    return phrase_list
+
+def search_for_awards(df_tweets):
+
+    # g1 = df_tweets['text'].str.extract(r'(?:wins|won) (best [\w ,-]+) (?:for|[!#])', re.IGNORECASE).dropna()
+    # g2 = df_tweets['text'].str.extract(r'(?:wins|won)[\w ]*golden ?globe[\w ]* (?:for|[!#]) (best [\w ,-]+)', re.IGNORECASE).dropna() # this may not work well
+    # g3 = df_tweets['text'].str.extract(r'winner of (best [^!#]+) is', re.IGNORECASE).dropna() # this may not work well
+    # g4 = df_tweets['text'].str.extract(r'present(?:s|ed) (best [\w ,-]+)', re.IGNORECASE).dropna()
+    # g4 = df_tweets['text'].str.extract(r'presents (best [\w ,-]+)', re.IGNORECASE).dropna()
+    # g4 = df_tweets['text'].str.extract(r'presented (best [\w ,-]+)', re.IGNORECASE).dropna()
+    # g5 = df_tweets['text'].str.extract(r' ?(best [\w ,-]+) goes to', re.IGNORECASE).dropna()
+
+    # phrases = pd.concat([g1, g2, g3, g4, g5])
+    phrases = df_tweets['text'].str.extract(r'for (best [\w ,-]+) (?:for|[!#])', re.IGNORECASE).dropna()
+    phrases = phrases[~phrases[0].str.contains('golden ?globe', case=False, regex=True)]
+    return pd.DataFrame([candidate.lower() for candidate in phrases[0]], columns=['text'])
+
+def sentiment_analysis_helper(data_file_path, awards, year):
+    '''
+    Function calleb by gg_api for analyzing sentiment.
+    :param data_file_path: Path to the JSON file of tweets.
+    :return: Dictionary of people and the analyzed sentiment scores with respect to each person.
+    '''
+
+    json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
+
+    df_tweets = pd.DataFrame(json_data[0], columns=['text'])
+
+    if not os.path.exists('winners' + str(year) + '.csv'):
+        get_winner_helper(data_file_path, awards, year).values()
+        
+    with open('winners' + str(year) + '.csv') as winners_file:
+        winners = [winner[:-1] for winner in winners_file.readlines()]
+
+    sentiment = get_sentiment_scores(df_tweets, winners)
+    sentiment = {subject: sentiment[subject]['compound'] for subject in sentiment.keys()}
+
+    return sentiment
+
+def get_sentiment_scores(df_tweets, subjects):
+    '''
+    Calculates a set of sentiment scores based on dataset of tweets.
+    :param df_tweets: Pandas dataframe of tweets.
+    :param subjects: List of subjects (people, movies, etc.) about which to analyze sentiment.
+    :return: Dictionary of people and the analyzed sentiment scores with respect to each person.
+    '''
+    analyzer = SentimentIntensityAnalyzer()
+    sentiment = {}
+    for subject in subjects:
+        subject_tweets = filter_tweets(df_tweets, subject)['text']
+        sentiment_counter = collections.Counter()
+        # sentiment_counter.update(analyzer.polarity_scores(tweet)) for tweet in subject_tweets / len(subject_tweets)
+        for tweet in subject_tweets:
+            sentiment_counter.update(analyzer.polarity_scores(tweet))
+        sentiment[subject] = dict(sentiment_counter)
+        for score_type in sentiment[subject].keys():
+            sentiment[subject][score_type] /= len(subject_tweets)
+    return sentiment
+
+def polarity_to_text(polarity):
+    if polarity < -0.7:
+        return 'Very Negative'
+    if polarity >= -0.7 and polarity < -0.4:
+        return 'Somewhat Negative'
+    if polarity >= -0.4 and polarity < -0.1:
+        return 'Slightly Negative'
+    if polarity >= -0.1 and polarity < 0.1:
+        return 'Neutral'
+    if polarity >= 0.1 and polarity < 0.4:
+        return 'Slightly Positive'
+    if polarity >= 0.4 and polarity < 0.7:
+        return 'Somewhat Positive'
+    if polarity >= 0.7:
+        return 'Very Positive'
 
 def get_noun_frequencies(df_nouns):
     '''
@@ -181,7 +287,9 @@ def split_data_by_time(json_data, start_time):
     :return: Two dataframes of tweets (pre-show and non-pre-show) with desirable qualities.
     '''
 
-    df_tweets = pd.DataFrame(json_data[0], columns=['text'])        # Indexing [0] will cause problems for 2020 data
+    if len(json_data) == 1:
+        json_data = json_data[0]
+    df_tweets = pd.DataFrame(json_data, columns=['text'])        # Indexing [0] will cause problems for 2020 data
 
     if 'created_at' in df_tweets:
         df_tweets_after_start = df_tweets[pd.to_datetime(df_tweets['created_at']) >= start_time]
@@ -221,17 +329,24 @@ def get_hosts_helper(data_file_path):
 
 def get_awards_helper(data_file_path):
     '''
-
+    Attempts to find all of the award types using the given tweets.
     :param data_file_path: Path to the JSON file of tweets.
     :return:
     '''
     # Read in JSON data
     json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
 
-    # Split data into two dataframes: pre-show and after show starts
-    pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
+    df_tweets = pd.DataFrame(json_data[0], columns=['text'])
 
-    return []
+    df_nominee_tweets = filter_tweets(df_tweets, 'win|won|goes to|congratulations|congrats|congratz')
+
+    df_candidates = search_for_awards(df_nominee_tweets)
+
+    # df_noun_chunks = create_noun_chunks(df_nominee_tweets)
+    df_sorted_nouns = get_noun_frequencies(df_candidates)
+    phrases = fuzzy_group(df_sorted_nouns, 27)
+    # temp = df_sorted_nouns['text'][0:27]
+    return phrases
 
 def get_nominees_helper(data_file_path, award_names, awards_year):
     '''
@@ -354,6 +469,8 @@ def get_winner_helper(data_file_path, award_names, awards_year):
     :return: Dictionary containing 27 keys, with list as its value
     '''
 
+    # winners global (for use by other functions)
+
     # Define some useful parameters for processing
     num_possible_winner = 1
     award_winners = {}
@@ -392,6 +509,10 @@ def get_winner_helper(data_file_path, award_names, awards_year):
         award_winners[category] = imdb_candidates[0][0]
         # print("found the award winner")
         # print(t-time.time())
+    winners_file = open('winners' + str(awards_year) + '.csv', 'a')
+    for winner in award_winners.values():
+        winners_file.write(winner + '\n')
+    winners_file.close()
 
     return award_winners
 

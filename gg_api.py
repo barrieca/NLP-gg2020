@@ -82,7 +82,16 @@ def main():
     and then run gg_api.main(). This is the second thing the TA will
     run when grading. Do NOT change the name of this function or
     what it returns.'''
-    # Your code here
+
+    year = 2013
+    # Sentiment Analysis
+    data_file_path = 'gg' + str(year) + '.json'
+    award_names = OFFICIAL_AWARDS_1315 if int(year) < 2016 else OFFICIAL_AWARDS_1819
+    sentiment_dict = gg.sentiment_analysis_helper(data_file_path, award_names, year)
+    # print([(subject, gg.polarity_to_text(sentiment_dict[subject])) for subject in sentiment_dict])
+    for subject in sentiment_dict:
+        print(subject + ': ' + str(sentiment_dict[subject]) + ' -> ' + gg.polarity_to_text(sentiment_dict[subject]))
+
     return
 
 if __name__ == '__main__':

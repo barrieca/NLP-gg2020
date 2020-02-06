@@ -85,15 +85,13 @@ def filter_by_category(df_tweets, award_category):
     df_filtered_tweets = pd.DataFrame(df_tweets)
 
     if 'picture' in award_category:
-        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'picture|movie|film')
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'pic|movie|film')
     if 'television' in award_category:
-        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'television|series|tv')
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'television|series|tv|show|hbo|netflix|hulu')
     if 'actor' in award_category:
         df_filtered_tweets = filter_tweets(df_filtered_tweets, 'actor|he|him|his|[^fe]male|[^wo]man')
     if 'actress' in award_category:
         df_filtered_tweets = filter_tweets(df_filtered_tweets, 'actress|she|her|female|woman')
-    if 'television' in award_category:
-        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'television|series|tv')
     if 'drama' in award_category:
         df_filtered_tweets = filter_tweets(df_filtered_tweets, 'drama')
     if 'musical' in award_category or 'comedy' in award_category:
@@ -260,7 +258,8 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
     # For each award category
     for category in award_names:
         # Filter tweets by subject string
-        df_nominee_tweets = filter_tweets(data, 'nomin|should|wish|win|won|goes to|not win|nod|sad|pain|down|hope|rob|snub')
+        # Potential things to add: why
+        df_nominee_tweets = filter_tweets(data, 'nomin|should|wish|win|won|goes to|not win|nod|sad|pain|down|hope|rob|snub|predict|expect|won against|think|thought|beat')
 
         # Filter based on the award category
         df_nominee_tweets = filter_by_category(df_nominee_tweets, category)
@@ -280,8 +279,15 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
         # print("found imdb candidates")
 
         # Store winner
-        award_nominees[category] = [nominee[0] for nominee in imdb_candidates[0:num_possible_winner]]
-        # print("found the award winner")
+        award_nominees[category] = [nominee[0] for nominee in imdb_candidates[1:num_possible_winner]]
+
+        # Fill up awards array with default values
+        appendees = ['i','a','e','u']
+        if 'best' not in category:
+            award_nominees[category] = []
+        else:
+            while len(award_nominees[category]) < num_possible_winner-1:
+                award_nominees[category].append(appendees[len(award_nominees[category])])
 
     print(award_nominees)
     print(t - time.time())

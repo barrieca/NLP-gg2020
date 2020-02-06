@@ -83,9 +83,14 @@ def main():
     run when grading. Do NOT change the name of this function or
     what it returns.'''
 
-    get_winner(2013)
-    # Sentiment Analysis - probably a better place to put this stuff
-    print(gg.sentiment_analysis_helper('gg' + str(2013) + '.json'))
+    year = 2013
+    # Sentiment Analysis
+    data_file_path = 'gg' + str(year) + '.json'
+    award_names = OFFICIAL_AWARDS_1315 if int(year) < 2016 else OFFICIAL_AWARDS_1819
+    sentiment_dict = gg.sentiment_analysis_helper(data_file_path, award_names, year)
+    # print([(subject, gg.polarity_to_text(sentiment_dict[subject])) for subject in sentiment_dict])
+    for subject in sentiment_dict:
+        print(subject + ': ' + str(sentiment_dict[subject]) + ' -> ' + gg.polarity_to_text(sentiment_dict[subject]))
 
     return
 

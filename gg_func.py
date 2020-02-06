@@ -4,13 +4,12 @@ import imdb
 import itertools
 import json
 import Levenshtein
+import os
 import pandas as pd
 import re
 import spacy
 import time
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-
-the_winners = {}
 
 def find_truncated_candidates(df, search_type, min=1):
     '''
@@ -192,7 +191,7 @@ def search_for_awards(df_tweets):
     phrases = phrases[~phrases[0].str.contains('golden ?globe', case=False, regex=True)]
     return pd.DataFrame([candidate.lower() for candidate in phrases[0]], columns=['text'])
 
-def sentiment_analysis_helper(data_file_path):
+def sentiment_analysis_helper(data_file_path, awards, year):
     '''
     Function calleb by gg_api for analyzing sentiment.
     :param data_file_path: Path to the JSON file of tweets.
@@ -203,9 +202,11 @@ def sentiment_analysis_helper(data_file_path):
 
     df_tweets = pd.DataFrame(json_data[0], columns=['text'])
 
-    if len(the_winners) == 0:
-        return {}
-    winners = the_winners.values()
+    if not os.path.exists('winners' + str(year) + '.csv'):
+        get_winner_helper(data_file_path, awards, year).values()
+        
+    with open('winners' + str(year) + '.csv') as winners_file:
+        winners = [winner[:-1] for winner in winners_file.readlines()]
 
     sentiment = get_sentiment_scores(df_tweets, winners)
     sentiment = {subject: sentiment[subject]['compound'] for subject in sentiment.keys()}
@@ -231,6 +232,22 @@ def get_sentiment_scores(df_tweets, subjects):
         for score_type in sentiment[subject].keys():
             sentiment[subject][score_type] /= len(subject_tweets)
     return sentiment
+
+def polarity_to_text(polarity):
+    if polarity < -0.7:
+        return 'Very Negative'
+    if polarity >= -0.7 and polarity < -0.4:
+        return 'Somewhat Negative'
+    if polarity >= -0.4 and polarity < -0.1:
+        return 'Slightly Negative'
+    if polarity >= -0.1 and polarity < 0.1:
+        return 'Neutral'
+    if polarity >= 0.1 and polarity < 0.4:
+        return 'Slightly Positive'
+    if polarity >= 0.4 and polarity < 0.7:
+        return 'Somewhat Positive'
+    if polarity >= 0.7:
+        return 'Very Positive'
 
 def get_noun_frequencies(df_nouns):
     '''
@@ -272,7 +289,9 @@ def split_data_by_time(json_data, start_time):
     :return: Two dataframes of tweets (pre-show and non-pre-show) with desirable qualities.
     '''
 
-    df_tweets = pd.DataFrame(json_data[0], columns=['text'])        # Indexing [0] will cause problems for 2020 data
+    if len(json_data) == 1:
+        json_data = json_data[0]
+    df_tweets = pd.DataFrame(json_data, columns=['text'])        # Indexing [0] will cause problems for 2020 data
 
     if 'created_at' in df_tweets:
         df_tweets_after_start = df_tweets[pd.to_datetime(df_tweets['created_at']) >= start_time]
@@ -445,7 +464,6 @@ def get_winner_helper(data_file_path, award_names, awards_year):
     '''
 
     # winners global (for use by other functions)
-    global the_winners
 
     # Define some useful parameters for processing
     num_possible_winner = 1
@@ -485,7 +503,10 @@ def get_winner_helper(data_file_path, award_names, awards_year):
         award_winners[category] = imdb_candidates[0][0]
         # print("found the award winner")
         # print(t-time.time())
-    the_winners = award_winners
+    winners_file = open('winners' + str(awards_year) + '.csv', 'a')
+    for winner in award_winners.values():
+        winners_file.write(winner + '\n')
+    winners_file.close()
 
     return award_winners
 

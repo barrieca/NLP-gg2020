@@ -5,3 +5,6 @@ gg2015.json
 NLP-gg2020.iml
 *.swp
 __pycache__/*
+*.csv
+*.pyc
+*.pyo

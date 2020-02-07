@@ -4,14 +4,13 @@ import imdb
 import itertools
 import json
 import Levenshtein
+import os
 import pandas as pd
 import re
 import spacy
 import time
 import numpy as np
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-
-the_winners = {}
 
 def find_truncated_candidates(df, search_type, min=1):
     '''
@@ -94,15 +93,13 @@ def filter_by_category(df_tweets, award_category):
     df_filtered_tweets = pd.DataFrame(df_tweets)
 
     if 'picture' in award_category:
-        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'picture|movie|film')
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'pic|movie|film')
     if 'television' in award_category:
-        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'television|series|tv')
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'television|series|tv|show|hbo|netflix|hulu')
     if 'actor' in award_category:
         df_filtered_tweets = filter_tweets(df_filtered_tweets, 'actor|he|him|his|[^fe]male|[^wo]man')
     if 'actress' in award_category:
         df_filtered_tweets = filter_tweets(df_filtered_tweets, 'actress|she|her|female|woman')
-    if 'television' in award_category:
-        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'television|series|tv')
     if 'drama' in award_category:
         df_filtered_tweets = filter_tweets(df_filtered_tweets, 'drama')
     if 'musical' in award_category or 'comedy' in award_category:
@@ -195,7 +192,7 @@ def search_for_awards(df_tweets):
     phrases = phrases[~phrases[0].str.contains('golden ?globe', case=False, regex=True)]
     return pd.DataFrame([candidate.lower() for candidate in phrases[0]], columns=['text'])
 
-def sentiment_analysis_helper(data_file_path):
+def sentiment_analysis_helper(data_file_path, awards, year):
     '''
     Function calleb by gg_api for analyzing sentiment.
     :param data_file_path: Path to the JSON file of tweets.
@@ -206,9 +203,11 @@ def sentiment_analysis_helper(data_file_path):
 
     df_tweets = pd.DataFrame(json_data[0], columns=['text'])
 
-    if len(the_winners) == 0:
-        return {}
-    winners = the_winners.values()
+    if not os.path.exists('winners' + str(year) + '.csv'):
+        get_winner_helper(data_file_path, awards, year).values()
+        
+    with open('winners' + str(year) + '.csv') as winners_file:
+        winners = [winner[:-1] for winner in winners_file.readlines()]
 
     sentiment = get_sentiment_scores(df_tweets, winners)
     sentiment = {subject: sentiment[subject]['compound'] for subject in sentiment.keys()}
@@ -248,6 +247,22 @@ def get_sentiments_for_all_tweets(df_tweets):
         sentiment_list.append(analyzer.polarity_scores(tweet)['compound'])
     df_tweets['sentiment'] = sentiment_list
     return df_tweets
+
+def polarity_to_text(polarity):
+    if polarity < -0.7:
+        return 'Very Negative'
+    if polarity >= -0.7 and polarity < -0.4:
+        return 'Somewhat Negative'
+    if polarity >= -0.4 and polarity < -0.1:
+        return 'Slightly Negative'
+    if polarity >= -0.1 and polarity < 0.1:
+        return 'Neutral'
+    if polarity >= 0.1 and polarity < 0.4:
+        return 'Slightly Positive'
+    if polarity >= 0.4 and polarity < 0.7:
+        return 'Somewhat Positive'
+    if polarity >= 0.7:
+        return 'Very Positive'
 
 def get_noun_frequencies(df_nouns):
     '''
@@ -289,7 +304,9 @@ def split_data_by_time(json_data, start_time):
     :return: Two dataframes of tweets (pre-show and non-pre-show) with desirable qualities.
     '''
 
-    df_tweets = pd.DataFrame(json_data[0], columns=['text'])        # Indexing [0] will cause problems for 2020 data
+    if len(json_data) == 1:
+        json_data = json_data[0]
+    df_tweets = pd.DataFrame(json_data, columns=['text'])        # Indexing [0] will cause problems for 2020 data
 
     if 'created_at' in df_tweets:
         df_tweets_after_start = df_tweets[pd.to_datetime(df_tweets['created_at']) >= start_time]
@@ -373,7 +390,8 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
     # For each award category
     for category in award_names:
         # Filter tweets by subject string
-        df_nominee_tweets = filter_tweets(data, 'nomin|should|wish|win|won|goes to|not win|nod|sad|pain|down|hope|rob|snub')
+        # Potential things to add: why
+        df_nominee_tweets = filter_tweets(data, 'nomin|should|wish|win|won|goes to|not win|nod|sad|pain|down|hope|rob|snub|predict|expect|won against|think|thought|beat')
 
         # Filter based on the award category
         df_nominee_tweets = filter_by_category(df_nominee_tweets, category)
@@ -393,8 +411,15 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
         # print("found imdb candidates")
 
         # Store winner
-        award_nominees[category] = [nominee[0] for nominee in imdb_candidates[0:num_possible_winner]]
-        # print("found the award winner")
+        award_nominees[category] = [nominee[0] for nominee in imdb_candidates[1:num_possible_winner]]
+
+        # Fill up awards array with default values
+        appendees = ['i','a','e','u']
+        if 'best' not in category:
+            award_nominees[category] = []
+        else:
+            while len(award_nominees[category]) < num_possible_winner-1:
+                award_nominees[category].append(appendees[len(award_nominees[category])])
 
     print(award_nominees)
     print(t - time.time())
@@ -462,7 +487,6 @@ def get_winner_helper(data_file_path, award_names, awards_year):
     '''
 
     # winners global (for use by other functions)
-    global the_winners
 
     # Define some useful parameters for processing
     num_possible_winner = 1
@@ -502,7 +526,10 @@ def get_winner_helper(data_file_path, award_names, awards_year):
         award_winners[category] = imdb_candidates[0][0]
         # print("found the award winner")
         # print(t-time.time())
-    the_winners = award_winners
+    winners_file = open('winners' + str(awards_year) + '.csv', 'a')
+    for winner in award_winners.values():
+        winners_file.write(winner + '\n')
+    winners_file.close()
 
     return award_winners
 

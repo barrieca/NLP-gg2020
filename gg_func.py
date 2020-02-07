@@ -530,8 +530,8 @@ def get_best_dressed_helper(data_file_path):
 
     # if too many tweets, sample 2000 with replacement
 
-    if df_clothes_tweets.size > 2000:
-        df_clothes_tweets = df_clothes_tweets.sample(2000, replace=True)
+    if df_clothes_tweets.size > 1500:
+        df_clothes_tweets = df_clothes_tweets.sample(1500, replace=True)
 
     # get sentiment scores for all tweets
 
@@ -545,7 +545,7 @@ def get_best_dressed_helper(data_file_path):
     df_noun_chunks = create_noun_chunks(df_clothes_tweets)
     # print("found noun chunks")
 
-    df_noun_chunks = filter_tweets(df_noun_chunks, 'tonight|damn|second|americans', True)
+    df_noun_chunks = filter_tweets(df_noun_chunks, 'tonight|damn|second|americans|alexander mcqueen', True)
 
     # Aggregate and sort the noun chunks
     df_sorted_nouns = get_noun_frequencies(df_noun_chunks)
@@ -582,8 +582,8 @@ def get_average_sentiment_scores(df, people_list):
     people_and_average_sentiment_list = []
     for p, f in people_list:
         df_filtered = filter_tweets(df, p)
-        val = df_filtered['sentiment'].sum(axis=0)/np.log(f)
-        people_and_average_sentiment_list.append((p, np.abs(val)))
+        val = df_filtered['sentiment'].sum(axis=0)/np.log(len(df_filtered)) if len(df_filtered) > 1 else df_filtered['sentiment'].sum(axis=0)
+        people_and_average_sentiment_list.append((p, val))
     return people_and_average_sentiment_list
 
 def get_controversial_sentiment_scores(df, people_list):

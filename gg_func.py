@@ -9,6 +9,7 @@ import pandas as pd
 import re
 import spacy
 import time
+import numpy as np
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 def find_truncated_candidates(df, search_type, min=1):
@@ -41,6 +42,8 @@ def find_imdb_objects(df, search_type, n=1, year=0, is_movie=False, fuzzy_thresh
     results = []
     for i, row in df.iterrows():
         noun = row['text']
+        if noun.lower() == 'tonight' or noun.lower() == 'damn':
+            continue
         result = search_function(noun)
         if not any(possible[search_type] in results_elt for results_elt in results for possible in result): # get rid of duplicates
             if search_type == 'title':
@@ -230,6 +233,20 @@ def get_sentiment_scores(df_tweets, subjects):
         for score_type in sentiment[subject].keys():
             sentiment[subject][score_type] /= len(subject_tweets)
     return sentiment
+
+def get_sentiments_for_all_tweets(df_tweets):
+    '''
+    Returns the dataframe with each cell in 'text' column given a sentiment score
+    :param df_tweets: a dataframe containing tweets in the text column
+    :return: a dataframe containing tweets in the text column and sentiment of the tweet in the sentiment column
+    '''
+    sentiment_list = []
+    analyzer = SentimentIntensityAnalyzer()
+    for i, row in df_tweets.iterrows():
+        tweet = row['text']
+        sentiment_list.append(analyzer.polarity_scores(tweet)['compound'])
+    df_tweets['sentiment'] = sentiment_list
+    return df_tweets
 
 def polarity_to_text(polarity):
     if polarity < -0.7:
@@ -516,6 +533,133 @@ def get_winner_helper(data_file_path, award_names, awards_year):
 
     return award_winners
 
+def get_best_dressed_helper(data_file_path):
+    '''
+
+    :param data_file_path:
+    :param award_names:
+    :return:
+    '''
+    t = time.time()
+    # Read in JSON data
+    json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
+
+    # Split data into two dataframes: pre-show and after show starts
+    pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
+
+    # find all the dressing related tweets
+
+    df_clothes_tweets = filter_tweets(data, 'nice|awful|ew|good|great|fine|hot|ugly|bad|horrible|best|worst|fab|stun|glow|damn')
+
+    df_clothes_tweets = filter_tweets(df_clothes_tweets, 'wear|dress|came in|sport')
+
+    print('filtered clothes tweets | ' + str(df_clothes_tweets.size))
+
+    # if too many tweets, sample 2000 with replacement
+
+    if df_clothes_tweets.size > 1500:
+        df_clothes_tweets = df_clothes_tweets.sample(1500, replace=True)
+
+    # get sentiment scores for all tweets
+
+    df_clothes_tweets = get_sentiments_for_all_tweets(df_clothes_tweets)
+
+    df_clothes_tweets['controversy_score'] = df_clothes_tweets['sentiment'].apply(np.sign)
+
+    print(df_clothes_tweets.size)
+
+    # find the most often occurring entities among the tweets
+    df_noun_chunks = create_noun_chunks(df_clothes_tweets)
+    # print("found noun chunks")
+
+    df_noun_chunks = filter_tweets(df_noun_chunks, 'tonight|damn|second|americans|alexander mcqueen', True)
+
+    # Aggregate and sort the noun chunks
+    df_sorted_nouns = get_noun_frequencies(df_noun_chunks)
+
+    # Get top 20 mentioned people
+    people_list = find_imdb_objects(df_sorted_nouns, 'name', 20)
+
+    # Get average sentiment score for each person
+
+    sentiment_scores = get_average_sentiment_scores(df_clothes_tweets, people_list)
+
+    # Sort list of people-sentiment scores
+
+    sentiment_scores = sorted(sentiment_scores, key=lambda x: x[1], reverse=True)
+
+    controversial_scores = get_controversial_sentiment_scores(df_clothes_tweets, people_list)
+
+    print(time.time()-t)
+
+    print('best dressed | '+str(sentiment_scores[0][0]))
+
+    print('worst dressed | '+str(sentiment_scores[-1][0]))
+
+    print('most controversially dressed | '+str(controversial_scores[0][0]))
+
+def get_average_sentiment_scores(df, people_list):
+    '''
+    Return a list containing tuples of people and their total sentiment score divided by the ln of its frequency
+        (people with many mentions will have higher total sentiment scores, and this alleviates that slightly)
+    :param df:
+    :param people_list:
+    :return:
+    '''
+    people_and_average_sentiment_list = []
+    for p, f in people_list:
+        df_filtered = filter_tweets(df, p)
+        val = df_filtered['sentiment'].sum(axis=0)/np.log(len(df_filtered)) if len(df_filtered) > 1 else df_filtered['sentiment'].sum(axis=0)
+        people_and_average_sentiment_list.append((p, val))
+    return people_and_average_sentiment_list
+
+def get_controversial_sentiment_scores(df, people_list):
+    '''
+    Returns a list of tuples with people and the average of their positive and negative mentions
+    :param df:
+    :param people_list:
+    :return:
+    '''
+    people_and_controversial_sentiment_list = []
+    for p, f in people_list:
+        df_filtered = filter_tweets(df, p)
+        df_filtered = df_filtered[~df_filtered.controversy_score.astype(str).str.contains('0.', regex=True)]
+        val = df_filtered['sentiment'].sum(axis=0)
+        val = val/len(df_filtered) if len(df_filtered) > 0 else val
+        people_and_controversial_sentiment_list.append((p, np.abs(val)))
+    return sorted(people_and_controversial_sentiment_list, key=lambda x: x[1])
+
+def choose_gender(person):
+    '''
+    Returns man if person is a man, woman if person is a person, else None
+    :param person: a string (possibly) name
+    :return:
+    '''
+    imdb_obj = imdb.IMDb()
+    imdb_obj_person = imdb.search_person(person)
+    bio = (imdb_obj.get_person_biography(imdb_obj_person) if imdb_obj_person and
+                                                             fuzzy_match(imdb_obj_person, person, 0.1) else None)
+    return bio_parser(bio)
+
+def bio_parser(bio):
+    '''
+    Returns man if man pronouns are more prominent in the biography, else returns woman if the object
+        had a biography, else returns None
+    :param bio:
+    :return:
+    '''
+    woman_pronoun = {'she', 'her'}
+    man_pronoun = {'he', 'him', 'his'}
+    woman_counter = 0
+    man_counter = 0
+    for word in bio.split():
+        if word in woman_pronoun:
+            woman_counter += 1
+        elif word in man_pronoun:
+            man_counter += 1
+    return 'man' if man_counter > woman_counter else 'woman' if bio else None
+
+
 def fuzzy_match(s1, s2, threshold=0.25):
     '''
     Uses Levenshtein distance to determine how well two strings match.
@@ -547,7 +691,7 @@ entity_type_to_imdb_type = {'person': 'name', 'tv': 'title', 'movie': 'title'}
 
 noun_chunk_stop_words = {'i', 'you', 'golden globe', 'golden globes', 'goldenglobes', 'congratulations', '#', 'the golden globes', 'a golden globe', 'the golden globe', 'he', 'she', 'me', 'who', 'they', 'it', 'golden globes 2020', 'goldenglobes2020', 'golden globe award', '#goldenglobes2020', 'globes', '@goldenglobes', 'golden globe awards', 'goldenglobe'}
 
-# def main():
+def main():
 
     # Read in JSON data
     # data = [json.loads(line) for line in open('gg2020.json','r',encoding='utf-8')]
@@ -557,11 +701,11 @@ noun_chunk_stop_words = {'i', 'you', 'golden globe', 'golden globes', 'goldenglo
     #
     # print(get_hosts_helper(data))
 
-#     #print(get_winner(data))
+     get_best_dressed_helper('gg2015.json')
 #     # print(filter_tweets(data, 'present').size)
 #     print(get_presenters_helper(data))
 
 
 # t = time.time()
-# main()
+main()
 # print(time.time()-t)

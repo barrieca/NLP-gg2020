@@ -77,28 +77,29 @@ def pre_ceremony():
     print("Pre-ceremony processing complete.")
     return
 
-def main(year):
-    '''This function calls your program. Typing "python gg_api.py"
-    will run this function. Or, in the interpreter, import gg_api
-    and then run gg_api.main(). This is the second thing the TA will
-    run when grading. Do NOT change the name of this function or
-    what it returns.'''
+def get_sentiment(year):
 
     # Sentiment Analysis
     data_file_path = 'gg' + str(year) + '.json'
     award_names = OFFICIAL_AWARDS_1315 if int(year) < 2016 else OFFICIAL_AWARDS_1819
     sentiment_dict = gg.sentiment_analysis_helper(data_file_path, award_names, year)
     # print([(subject, gg.polarity_to_text(sentiment_dict[subject])) for subject in sentiment_dict])
+    print("\nSentiment\n---------")
     for subject in sentiment_dict:
         print(subject + ': ' + str(sentiment_dict[subject]) + ' -> ' + gg.polarity_to_text(sentiment_dict[subject]))
 
     return
 
+def main():
+    '''This function calls your program. Typing "python gg_api.py"
+    will run this function. Or, in the interpreter, import gg_api
+    and then run gg_api.main(). This is the second thing the TA will
+    run when grading. Do NOT change the name of this function or
+    what it returns.'''
+
+    return
+
 if __name__ == '__main__':
 
-    if len(sys.argv) > 1:
-        year = sys.argv[1]
-        main(year)
-    else:
-        print("Usage:\n$ python gg_api.py <year>")
+    main()
 

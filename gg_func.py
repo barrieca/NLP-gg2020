@@ -163,6 +163,7 @@ def fuzzy_group(df_phrases, truncate_at):
         row['text'] = trimend(row['text'], ' goes to')
         row['text'] = trimend(row['text'], ' in$')
         row['text'] = trimend(row['text'], ' at the')
+        row['text'] = trimend(row['text'], ' is.*')
         already_in_list = False
         for j in range(len(phrase_list)):
             if phrase_list[j].startswith(row['text']):
@@ -204,7 +205,7 @@ def sentiment_analysis_helper(data_file_path, awards, year):
 
     if not os.path.exists('winners' + str(year) + '.csv'):
         get_winner_helper(data_file_path, awards, year).values()
-        
+
     with open('winners' + str(year) + '.csv') as winners_file:
         winners = [winner[:-1] for winner in winners_file.readlines()]
 
@@ -348,6 +349,10 @@ def get_awards_helper(data_file_path):
     df_sorted_nouns = get_noun_frequencies(df_candidates)
     phrases = fuzzy_group(df_sorted_nouns, 27)
     # temp = df_sorted_nouns['text'][0:27]
+
+    print("\nAwards\n------")
+    for phrase in phrases:
+        print(phrase)
     return phrases
 
 def get_nominees_helper(data_file_path, award_names, awards_year):

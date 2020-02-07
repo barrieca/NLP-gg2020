@@ -163,7 +163,9 @@ def fuzzy_group(df_phrases, truncate_at):
         row['text'] = trimend(row['text'], ' goes to')
         row['text'] = trimend(row['text'], ' in$')
         row['text'] = trimend(row['text'], ' at the')
-        row['text'] = trimend(row['text'], ' is.*')
+        row['text'] = trimend(row['text'], ' is .*')
+        row['text'] = trimend(row['text'], ' and .*')
+        row['text'] = " ".join(row['text'].split())
         already_in_list = False
         for j in range(len(phrase_list)):
             if phrase_list[j].startswith(row['text']):

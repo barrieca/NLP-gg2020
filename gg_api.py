@@ -31,6 +31,7 @@ def get_awards(year):
     print("\nAwards\n------")
     for award in awards:
         print(award)
+    print('')
     return awards
 
 def get_nominees(year):
@@ -48,7 +49,9 @@ def get_nominees(year):
     nominees = gg.get_nominees_helper(data_file_path, award_names, year)
     print("\nNominees\n--------")
     for award in nominees.keys():
-        print(award + ': ' + ', '.join(nominees[award]))
+        # print(award + ': ' + ', '.join(nominees[award]))
+        print(award + ': ' + str(nominees[award]))
+    print('')
     return nominees
 
 def get_winner(year):
@@ -67,6 +70,7 @@ def get_winner(year):
     print("\nWinners\n-------")
     for award in winners.keys():
         print(award + ': ' + winners[award])
+    print('')
     return winners
 
 def get_presenters(year):
@@ -84,7 +88,8 @@ def get_presenters(year):
     presenters = gg.get_presenters_helper(data_file_path, award_names)
     print("\nPresenters\n----------")
     for award in presenters.keys():
-        print(award + ': ' + ', '.join(presenters[award]))
+        print(award + ': ' + str(presenters[award]))
+    print('')
     return presenters
 
 def pre_ceremony():
@@ -106,6 +111,7 @@ def get_sentiment(year):
     print("\nSentiment (of winners)\n----------------------")
     for subject in sentiment_dict:
         print(subject + ': ' + str(sentiment_dict[subject]) + ' -> ' + gg.polarity_to_text(sentiment_dict[subject]))
+    print('')
 
     return
 

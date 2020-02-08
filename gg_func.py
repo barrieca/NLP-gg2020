@@ -348,7 +348,7 @@ def get_hosts_helper(data_file_path):
     # Get the entities present in these tweets
     df_filtered_tweets = get_noun_frequencies(create_noun_chunks(df_filtered_tweets))
 
-    print(time.time() - t)
+    print(time.time() - t) # TODO: remove before submitting
 
     # Determine the most likely host, max 2 hosts
     return find_truncated_candidates(df_filtered_tweets, 'name', max_hosts)
@@ -418,19 +418,19 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
         if len(df_nominee_category_tweets) > num_tweets_to_sample:
             df_nominee_category_tweets = df_nominee_category_tweets.sample(num_tweets_to_sample, replace=True)
 
-        print("filtered nominee tweets | " + str(df_nominee_category_tweets.size))
+        print("filtered nominee tweets | " + str(df_nominee_category_tweets.size)) # TODO: remove before submitting
 
         # Get the nouns chunks in the remaining tweets
         df_noun_chunks = create_noun_chunks(df_nominee_category_tweets)
-        print("found noun chunks")
+        print("found noun chunks") # TODO: remove before submitting
 
         # Aggregate and sort the noun chunks
         df_sorted_nouns = get_noun_frequencies(df_noun_chunks)
-        print("found noun frequencies")
+        print("found noun frequencies") # TODO: remove before submitting
 
         # Produce the correct number of noun chunks that also exist on IMDb
         imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], num_possible_winner, awards_year, award_entity_type[category] == 'movie')
-        print("found imdb candidates")
+        print("found imdb candidates") # TODO: remove before submitting
 
         # Store winner
         award_nominees[category] = [nominee[0] for nominee in imdb_candidates[1:num_possible_winner]]
@@ -443,8 +443,8 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
             while len(award_nominees[category]) < num_possible_winner-1:
                 award_nominees[category].append(appendees[len(award_nominees[category])])
 
-    print(award_nominees)
-    print(time.time() - t)
+    # print(award_nominees)
+    print(time.time() - t) # TODO: remove before submitting
     return award_nominees
 
 def get_presenters_helper(data_file_path, award_names):
@@ -478,32 +478,32 @@ def get_presenters_helper(data_file_path, award_names):
 
         # Filter based on the award category
         df_presenter_category_tweets = filter_by_category(df_presenter_tweets, category)
-
+        # df_presenter_category_tweets.to_json('temp_presenter_jsons/' + category + '.json')
         # Subsample a fixed maximum number of tweets
         num_tweets_to_sample = 200
         if len(df_presenter_category_tweets) > num_tweets_to_sample:
             df_presenter_category_tweets = df_presenter_category_tweets.sample(num_tweets_to_sample, replace=True)
 
-        print("filtered presenter tweets | " + str(df_presenter_category_tweets.size))
+        print("filtered presenter tweets | " + str(df_presenter_category_tweets.size)) # TODO: remove before submitting
 
         # Get the nouns chunks in the remaining tweets
         df_noun_chunks = create_noun_chunks(df_presenter_category_tweets)
-        print("found noun chunks")
+        print("found noun chunks") # TODO: remove before submitting
 
         # Aggregate and sort the noun chunks
         df_sorted_nouns = get_noun_frequencies(df_noun_chunks)
-        print("found noun frequencies")
+        print("found noun frequencies") # TODO: remove before submitting
 
         # Produce the correct number of noun chunks that also exist on IMDb
-        imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], num_possible_presenters)
-        print("found imdb candidates")
+        imdb_candidates = find_imdb_objects(df_sorted_nouns, 'name', num_possible_presenters)
+        print("found imdb candidates") # TODO: remove before submitting
 
         # Store winner
         award_presenters[category] = statistical_truncation(imdb_candidates, 0.6, 1)
         # print("found the award presenters")
 
-    print(award_presenters)
-    print(time.time() - t)
+    # print(award_presenters)
+    print(time.time() - t) # TODO: remove before submitting
     return award_presenters
 
 def get_winner_helper(data_file_path, award_names, awards_year):
@@ -552,19 +552,19 @@ def get_winner_helper(data_file_path, award_names, awards_year):
         if len(df_nominee_category_tweets) > num_tweets_to_sample:
             df_nominee_category_tweets = df_nominee_category_tweets.sample(num_tweets_to_sample, replace=True)
 
-        print("filtered winner tweets | " + str(df_nominee_category_tweets.size))
+        print("filtered winner tweets | " + str(df_nominee_category_tweets.size)) # TODO: remove before submitting
 
         # Get the nouns chunks in the remaining tweets
         df_noun_chunks = create_noun_chunks(df_nominee_category_tweets)
-        print("found noun chunks")
+        print("found noun chunks") # TODO: remove before submitting
 
         # Aggregate and sort the noun chunks
         df_sorted_nouns = get_noun_frequencies(df_noun_chunks)
-        print("found noun frequencies")
+        print("found noun frequencies") # TODO: remove before submitting
 
         # Produce the correct number of noun chunks that also exist on IMDb
         imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], num_possible_winner, awards_year, award_entity_type[category] == 'movie')
-        print("found imdb candidates")
+        print("found imdb candidates") # TODO: remove before submitting
 
         # Store winner
         try:
@@ -578,7 +578,7 @@ def get_winner_helper(data_file_path, award_names, awards_year):
         winners_file.write(winner + '\n')
     winners_file.close()
 
-    print(time.time() - t)
+    print(time.time() - t) # TODO: remove before submitting
 
     return award_winners
 
@@ -605,7 +605,7 @@ def get_best_dressed_helper(data_file_path):
 
     df_clothes_tweets = filter_tweets(df_clothes_tweets, 'wear|dress|came in|sport')
 
-    print('filtered clothes tweets | ' + str(df_clothes_tweets.size))
+    print('filtered clothes tweets | ' + str(df_clothes_tweets.size)) # TODO: remove before submitting
 
     # if too many tweets, sample 2000 with replacement
 
@@ -618,7 +618,7 @@ def get_best_dressed_helper(data_file_path):
 
     df_clothes_tweets['controversy_score'] = df_clothes_tweets['sentiment'].apply(np.sign)
 
-    print(df_clothes_tweets.size)
+    print(df_clothes_tweets.size) # TODO: remove before submitting
 
     # find the most often occurring entities among the tweets
     df_noun_chunks = create_noun_chunks(df_clothes_tweets)
@@ -648,7 +648,7 @@ def get_best_dressed_helper(data_file_path):
 
     print('most controversially dressed | '+str(controversial_scores[0][0]))
 
-    print(time.time() - t)
+    print(time.time() - t) # TODO: remove before submitting
 
 def get_average_sentiment_scores(df, people_list):
     '''

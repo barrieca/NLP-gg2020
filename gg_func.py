@@ -42,8 +42,6 @@ def find_imdb_objects(df, search_type, n=1, year=0, is_movie=False, fuzzy_thresh
     results = []
     for i, row in df.iterrows():
         noun = row['text']
-        if noun.lower() == 'tonight' or noun.lower() == 'damn':
-            continue
         result = search_function(noun)
         if not any(possible[search_type] in results_elt for results_elt in results for possible in result): # get rid of duplicates
             if search_type == 'title':
@@ -51,7 +49,7 @@ def find_imdb_objects(df, search_type, n=1, year=0, is_movie=False, fuzzy_thresh
                     imdb_candidates = [object['long imdb title'][:-7] for object in result if object['kind'] == 'movie' and
                                        'year' in object and
                                        is_valid_movie_year(object['year'], year)]
-                    if len(imdb_candidates) > 0:
+                    if imdb_candidates:
                         for candidate in imdb_candidates:
                             if fuzzy_match(candidate.lower(), noun, fuzzy_threshold):
                                 results.append((candidate,row['freq']))
@@ -59,7 +57,7 @@ def find_imdb_objects(df, search_type, n=1, year=0, is_movie=False, fuzzy_thresh
                     imdb_candidates = [object['title'] for object in result if (object['kind'] == 'tv series' or object['kind'] == 'tv mini series' or object['kind'] == 'tv movie') and
                                        'year' in object and
                                        is_valid_series_year(object['year'], year)]
-                    if len(imdb_candidates) > 0:
+                    if imdb_candidates:
                         for candidate in imdb_candidates:
                             if fuzzy_match(candidate.lower(), noun, fuzzy_threshold):
                                 results.append((candidate, row['freq']))
@@ -95,7 +93,7 @@ def filter_by_category(df_tweets, award_category):
     if 'picture' in award_category:
         df_filtered_tweets = filter_tweets(df_filtered_tweets, 'pic|movie|film')
     if 'television' in award_category:
-        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'television|series|tv|show|hbo|netflix|hulu')
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'television|series|show|hbo|netflix|hulu')
     if 'actor' in award_category:
         df_filtered_tweets = filter_tweets(df_filtered_tweets, 'actor|he|him|his|[^fe]male|[^wo]man')
     if 'actress' in award_category:
@@ -113,15 +111,15 @@ def filter_by_category(df_tweets, award_category):
     if 'carol' in award_category:
         df_filtered_tweets = filter_tweets(df_filtered_tweets, 'carol')
     if 'animate' in award_category:
-        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'animate')
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'animate|cartoon')
     if 'foreign' in award_category:
         df_filtered_tweets = filter_tweets(df_filtered_tweets, 'foreign|language')
     if 'screenplay' in award_category:
-        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'screen|write')
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'screen|write|script')
     if 'score' in award_category:
-        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'score')
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'score|compose')
     if 'song' in award_category:
-        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'song')
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'song|music')
 
     return df_filtered_tweets
 
@@ -134,19 +132,10 @@ def create_noun_chunks(df_tweet):
     # Instantiate spacy
     nlp = spacy.load('en_core_web_sm')
 
-    # Apply the noun chunking to the remaining text
-    def find_noun_chunks(tweet_text):
-        return [chunk.text.lower() for chunk in [*nlp(tweet_text).ents] if chunk.text.lower() not in noun_chunk_stop_words]
+    df_tweet = df_tweet['text'].apply(lambda x: [*nlp(x).ents])
 
-    #create a list of tweets
-    array_of_tweets_text = df_tweet['text'].values.flatten()
-
-    #create noun chunks for each individual tweet, chain the noun chunks together, and create a dataframe
-    #of the noun chunks
-    noun_chunks = list(itertools.chain(*[find_noun_chunks(tweet) for tweet in array_of_tweets_text]))
-    df_noun_chunks = pd.DataFrame(noun_chunks, columns=['text'])
-
-    return df_noun_chunks
+    return pd.DataFrame([el.text.lower() for l in np.ravel(df_tweet)
+                     for el in l if el.text.lower() not in noun_chunk_stop_words], columns=['text'])
 
 def trimend(string, pattern):
     idx = re.search(pattern, string)
@@ -340,7 +329,7 @@ def get_hosts_helper(data_file_path):
     df_filtered_tweets = filter_tweets(df_filtered_tweets, 'next', True)
 
     # Provide an upper limit on the number of tweets to be analyzed
-    df_filtered_tweets = df_filtered_tweets.sample(1000, replace=True)
+    df_filtered_tweets = df_filtered_tweets.sample(700, replace=True)
 
     # Specify the maximum number of hosts for the Golden Globes
     max_hosts = 2
@@ -408,9 +397,11 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
     # Split data into two dataframes: pre-show and after show starts
     pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
 
+    data['text'] = data['text'].str.lower()
+
     # Filter tweets by subject string
     # Potential things to add: why
-    df_nominee_tweets = filter_tweets(data, 'nomin|should|wish|win|won|goes to|nod|sad|pain|down|hope|rob|snub|predict|expect|think|thought|beat')
+    df_nominee_tweets = filter_tweets(data, 'runner|nomin|should|wish|win|won|goes to|nod|sad|pain|down|hope|rob|snub|predict|expect|think|thought|beat')
 
     # For each award category
     for category in award_names:
@@ -421,7 +412,7 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
         df_nominee_category_tweets = filter_by_category(df_nominee_tweets, category)
 
         # Subsample a fixed maximum number of tweets
-        num_tweets_to_sample = 500
+        num_tweets_to_sample = 700
         if len(df_nominee_category_tweets) > num_tweets_to_sample:
             df_nominee_category_tweets = df_nominee_category_tweets.sample(num_tweets_to_sample, replace=True)
 
@@ -443,7 +434,7 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
         award_nominees[category] = [nominee[0] for nominee in imdb_candidates[1:num_possible_winner]]
 
         # Fill up awards array with default values
-        appendees = ['i','a','e','u']
+        appendees = ['a','i','e','u']
         if 'best' not in category:
             award_nominees[category] = []
         else:
@@ -477,6 +468,8 @@ def get_presenters_helper(data_file_path, award_names):
     # Split data into two dataframes: pre-show and after show starts
     pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
 
+    data['text'] = data['text'].str.lower()
+
     # Filter tweets by subject string
     df_presenter_tweets = filter_tweets(data, 'present|giv|hand|introduc')
 
@@ -502,7 +495,7 @@ def get_presenters_helper(data_file_path, award_names):
         print("found noun frequencies")
 
         # Produce the correct number of noun chunks that also exist on IMDb
-        imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], num_possible_presenters)
+        imdb_candidates = find_imdb_objects(df_sorted_nouns, 'name', num_possible_presenters, fuzzy_threshold=0.5)
         print("found imdb candidates")
 
         # Store winner
@@ -544,6 +537,8 @@ def get_winner_helper(data_file_path, award_names, awards_year):
     # Split data into two dataframes: pre-show and after show starts
     pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
 
+    data['text'] = data['text'].str.lower()
+
     # Filter tweets by subject string
     df_nominee_tweets = filter_tweets(data, 'win|won|goes to|congratulations|congrats|congratz')
 
@@ -555,7 +550,7 @@ def get_winner_helper(data_file_path, award_names, awards_year):
         df_nominee_category_tweets = filter_by_category(df_nominee_tweets, category)
 
         # Subsample a fixed maximum number of tweets
-        num_tweets_to_sample = 200
+        num_tweets_to_sample = 250
         if len(df_nominee_category_tweets) > num_tweets_to_sample:
             df_nominee_category_tweets = df_nominee_category_tweets.sample(num_tweets_to_sample, replace=True)
 
@@ -606,10 +601,11 @@ def get_best_dressed_helper(data_file_path):
     # Split data into two dataframes: pre-show and after show starts
     pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
 
+    data['text'] = data['text'].str.lower()
+
     # find all the dressing related tweets
 
     df_clothes_tweets = filter_tweets(data, 'nice|awful|ew|good|great|fine|hot|ugly|bad|horrible|best|worst|fab|stun|glow|damn')
-
     df_clothes_tweets = filter_tweets(df_clothes_tweets, 'wear|dress|came in|sport')
 
     print('filtered clothes tweets | ' + str(df_clothes_tweets.size))
@@ -622,7 +618,6 @@ def get_best_dressed_helper(data_file_path):
     # get sentiment scores for all tweets
 
     df_clothes_tweets = get_sentiments_for_all_tweets(df_clothes_tweets)
-
     df_clothes_tweets['controversy_score'] = df_clothes_tweets['sentiment'].apply(np.sign)
 
     print(df_clothes_tweets.size)
@@ -760,11 +755,11 @@ def main():
     #
     # print(get_hosts_helper(data))
 
-     get_best_dressed_helper('gg2015.json')
+     get_best_dressed_helper('gg2013.json')
 #     # print(filter_tweets(data, 'present').size)
 #     print(get_presenters_helper(data))
 
-
+#
 # t = time.time()
 # main()
 # print(time.time()-t)

@@ -42,8 +42,6 @@ def find_imdb_objects(df, search_type, n=1, year=0, is_movie=False, fuzzy_thresh
     results = []
     for i, row in df.iterrows():
         noun = row['text']
-        if noun.lower() == 'tonight' or noun.lower() == 'damn':
-            continue
         result = search_function(noun)
         if not any(possible[search_type] in results_elt for results_elt in results for possible in result): # get rid of duplicates
             if search_type == 'title':
@@ -51,7 +49,7 @@ def find_imdb_objects(df, search_type, n=1, year=0, is_movie=False, fuzzy_thresh
                     imdb_candidates = [object['long imdb title'][:-7] for object in result if object['kind'] == 'movie' and
                                        'year' in object and
                                        is_valid_movie_year(object['year'], year)]
-                    if len(imdb_candidates) > 0:
+                    if imdb_candidates:
                         for candidate in imdb_candidates:
                             if fuzzy_match(candidate.lower(), noun, fuzzy_threshold):
                                 results.append((candidate,row['freq']))
@@ -59,7 +57,7 @@ def find_imdb_objects(df, search_type, n=1, year=0, is_movie=False, fuzzy_thresh
                     imdb_candidates = [object['title'] for object in result if (object['kind'] == 'tv series' or object['kind'] == 'tv mini series' or object['kind'] == 'tv movie') and
                                        'year' in object and
                                        is_valid_series_year(object['year'], year)]
-                    if len(imdb_candidates) > 0:
+                    if imdb_candidates:
                         for candidate in imdb_candidates:
                             if fuzzy_match(candidate.lower(), noun, fuzzy_threshold):
                                 results.append((candidate, row['freq']))
@@ -134,19 +132,10 @@ def create_noun_chunks(df_tweet):
     # Instantiate spacy
     nlp = spacy.load('en_core_web_sm')
 
-    # Apply the noun chunking to the remaining text
-    def find_noun_chunks(tweet_text):
-        return [chunk.text.lower() for chunk in [*nlp(tweet_text).ents] if chunk.text.lower() not in noun_chunk_stop_words]
+    df_tweet = df_tweet['text'].apply(lambda x: [*nlp(x).ents])
 
-    #create a list of tweets
-    array_of_tweets_text = df_tweet['text'].values.flatten()
-
-    #create noun chunks for each individual tweet, chain the noun chunks together, and create a dataframe
-    #of the noun chunks
-    noun_chunks = list(itertools.chain(*[find_noun_chunks(tweet) for tweet in array_of_tweets_text]))
-    df_noun_chunks = pd.DataFrame(noun_chunks, columns=['text'])
-
-    return df_noun_chunks
+    return pd.DataFrame([el.text.lower() for l in np.ravel(df_tweet)
+                     for el in l if el.text.lower() not in noun_chunk_stop_words], columns=['text'])
 
 def trimend(string, pattern):
     idx = re.search(pattern, string)
@@ -340,7 +329,7 @@ def get_hosts_helper(data_file_path):
     df_filtered_tweets = filter_tweets(df_filtered_tweets, 'next', True)
 
     # Provide an upper limit on the number of tweets to be analyzed
-    df_filtered_tweets = df_filtered_tweets.sample(1000, replace=True)
+    df_filtered_tweets = df_filtered_tweets.sample(800, replace=True)
 
     # Specify the maximum number of hosts for the Golden Globes
     max_hosts = 2
@@ -421,7 +410,7 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
         df_nominee_category_tweets = filter_by_category(df_nominee_tweets, category)
 
         # Subsample a fixed maximum number of tweets
-        num_tweets_to_sample = 500
+        num_tweets_to_sample = 800
         if len(df_nominee_category_tweets) > num_tweets_to_sample:
             df_nominee_category_tweets = df_nominee_category_tweets.sample(num_tweets_to_sample, replace=True)
 
@@ -555,7 +544,7 @@ def get_winner_helper(data_file_path, award_names, awards_year):
         df_nominee_category_tweets = filter_by_category(df_nominee_tweets, category)
 
         # Subsample a fixed maximum number of tweets
-        num_tweets_to_sample = 200
+        num_tweets_to_sample = 150
         if len(df_nominee_category_tweets) > num_tweets_to_sample:
             df_nominee_category_tweets = df_nominee_category_tweets.sample(num_tweets_to_sample, replace=True)
 

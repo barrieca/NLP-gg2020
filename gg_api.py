@@ -12,8 +12,11 @@ def get_hosts(year):
 
     # Get the path to the correct tweets based on the year
     data_file_path = 'gg' + str(year) + '.json'
-
-    return gg.get_hosts_helper(data_file_path)
+    hosts = gg.get_hosts_helper(data_file_path)
+    print('')
+    for host in hosts:
+        print('Host: ' + host)
+    return hosts
 
 
 def get_awards(year):
@@ -24,7 +27,11 @@ def get_awards(year):
     data_file_path = 'gg' + str(year) + '.json'
 
     # Your code here
-    return gg.get_awards_helper(data_file_path)
+    awards = gg.get_awards_helper(data_file_path)
+    print("\nAwards\n------")
+    for award in awards:
+        print(award)
+    return awards
 
 def get_nominees(year):
     '''Nominees is a dictionary with the hard coded award
@@ -38,7 +45,11 @@ def get_nominees(year):
     award_names = OFFICIAL_AWARDS_1315 if int(year) < 2016 else OFFICIAL_AWARDS_1819
 
     # Your code here
-    return gg.get_nominees_helper(data_file_path, award_names, year)
+    nominees = gg.get_nominees_helper(data_file_path, award_names, year)
+    print("\nNominees\n--------")
+    for award in nominees.keys():
+        print(award + ': ' + ', '.join(nominees[award]))
+    return nominees
 
 def get_winner(year):
     '''Winners is a dictionary with the hard coded award
@@ -52,7 +63,11 @@ def get_winner(year):
     award_names = OFFICIAL_AWARDS_1315 if int(year) < 2016 else OFFICIAL_AWARDS_1819
 
     # Your code here
-    return gg.get_winner_helper(data_file_path, award_names, year)
+    winners = gg.get_winner_helper(data_file_path, award_names, year)
+    print("\nWinners\n-------")
+    for award in winners.keys():
+        print(award + ': ' + winners[award])
+    return winners
 
 def get_presenters(year):
     '''Presenters is a dictionary with the hard coded award
@@ -66,7 +81,11 @@ def get_presenters(year):
     award_names = OFFICIAL_AWARDS_1315 if int(year) < 2016 else OFFICIAL_AWARDS_1819
 
     # Your code here
-    return gg.get_presenters_helper(data_file_path, award_names)
+    presenters = gg.get_presenters_helper(data_file_path, award_names)
+    print("\nPresenters\n----------")
+    for award in presenters.keys():
+        print(award + ': ' + ', '.join(presenters[award]))
+    return presenters
 
 def pre_ceremony():
     '''This function loads/fetches/processes any data your program
@@ -84,7 +103,7 @@ def get_sentiment(year):
     award_names = OFFICIAL_AWARDS_1315 if int(year) < 2016 else OFFICIAL_AWARDS_1819
     sentiment_dict = gg.sentiment_analysis_helper(data_file_path, award_names, year)
     # print([(subject, gg.polarity_to_text(sentiment_dict[subject])) for subject in sentiment_dict])
-    print("\nSentiment\n---------")
+    print("\nSentiment (of winners)\n----------------------")
     for subject in sentiment_dict:
         print(subject + ': ' + str(sentiment_dict[subject]) + ' -> ' + gg.polarity_to_text(sentiment_dict[subject]))
 

@@ -365,11 +365,7 @@ def get_awards_helper(data_file_path):
     # df_noun_chunks = create_noun_chunks(df_nominee_tweets)
     df_sorted_nouns = get_noun_frequencies(df_candidates)
     phrases = fuzzy_group(df_sorted_nouns, 27)
-    # temp = df_sorted_nouns['text'][0:27]
 
-    print("\nAwards\n------")
-    for phrase in phrases:
-        print(phrase)
     return phrases
 
 def get_nominees_helper(data_file_path, award_names, awards_year):

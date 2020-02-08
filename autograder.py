@@ -221,15 +221,15 @@ def main(years, grading):
             del scores[y]['winner']['completeness']
     pprint(scores)
 
-    for year in years:
-        gg_api.get_sentiment(year)
+    # for year in years:
+    #     #     gg_api.get_sentiment(year)
 
 
 if __name__ == '__main__':
     # years = ['2013', '2015'] #don't forget to uncomment this before we turn it in
     # grading = ["hosts", "awards", "nominees", "presenters", "winner"]
-    years = ['2013']
-    grading = ["awards"]
+    years = ['2015']
+    grading = ["nominees"]
 
     if len(sys.argv) > 1:
         if '2013' in sys.argv:

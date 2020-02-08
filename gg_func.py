@@ -42,8 +42,6 @@ def find_imdb_objects(df, search_type, n=1, year=0, is_movie=False, fuzzy_thresh
     results = []
     for i, row in df.iterrows():
         noun = row['text']
-        if noun.lower() == 'tonight' or noun.lower() == 'damn':
-            continue
         result = search_function(noun)
         if not any(possible[search_type] in results_elt for results_elt in results for possible in result): # get rid of duplicates
             if search_type == 'title':
@@ -95,7 +93,7 @@ def filter_by_category(df_tweets, award_category):
     if 'picture' in award_category:
         df_filtered_tweets = filter_tweets(df_filtered_tweets, 'pic|movie|film')
     if 'television' in award_category:
-        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'television|series|tv|show|hbo|netflix|hulu')
+        df_filtered_tweets = filter_tweets(df_filtered_tweets, 'television|series|show|hbo|netflix|hulu')
     if 'actor' in award_category:
         df_filtered_tweets = filter_tweets(df_filtered_tweets, 'actor|he|him|his|[^fe]male|[^wo]man')
     if 'actress' in award_category:
@@ -392,6 +390,13 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
     :param award_names: The award names for the current year.
     :param awards_year: The year the Golden Globes were held.
     :return: A dictionary with the hard coded award names as keys, and each entry a list of strings denoting nominees.
+
+    498.99006819725037
+    {'2015': {'nominees': {'completeness': 0.08338095238095238, 'spelling': 0.4190429505135387}}}
+
+    234.04633617401123
+    {'2013': {'nominees': {'completeness': 0.04209523809523809, 'spelling': 0.24}}}
+
     '''
 
     print("processing nominees...")
@@ -408,8 +413,18 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
     # Split data into two dataframes: pre-show and after show starts
     pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
 
+    # Remove substrings from tweets
+    data['text'] = data['text'].str.replace('#|@|RT', '') # remove hashtags
+    data['text'] = data['text'].str.replace('http\S+|www.\S+', '') # remove urls
+    data['text'] = data['text'].str.replace('[G|g]olden\\s?[G|g]lobes', '') # remove golden globes
+    data['text'] = data['text'].str.replace('fuck|damn|shit', '') # remove profanity
+    data['text'] = data['text'].str.replace(awards_year + '|' + str(int(awards_year) - 1), '') # remove current and previous year
+
+    # Lowercase all the tweets
+    data['text'] = data['text'].str.lower()
+
     # Filter tweets by subject string
-    # Potential things to add: why
+    # Potential things to add: why, underdog, acknowledge
     df_nominee_tweets = filter_tweets(data, 'nomin|should|wish|win|won|goes to|nod|sad|pain|down|hope|rob|snub|predict|expect|think|thought|beat')
 
     # For each award category
@@ -435,6 +450,9 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
         df_sorted_nouns = get_noun_frequencies(df_noun_chunks)
         print("found noun frequencies")
 
+        # Filter out unwanted noun chunks
+        df_sorted_nouns = filter_tweets(df_sorted_nouns, 'first|tonight|one|hollywood|los angeles|beverly hills, day', True)
+
         # Produce the correct number of noun chunks that also exist on IMDb
         imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], num_possible_winner, awards_year, award_entity_type[category] == 'movie')
         print("found imdb candidates")
@@ -444,11 +462,19 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
 
         # Fill up awards array with default values
         appendees = ['i','a','e','u']
+        idx = 0
         if 'best' not in category:
             award_nominees[category] = []
         else:
+            df_sorted_nouns.reset_index(inplace=True, drop=True)
+
             while len(award_nominees[category]) < num_possible_winner-1:
                 award_nominees[category].append(appendees[len(award_nominees[category])])
+                # if idx < len(df_sorted_nouns):
+                #     award_nominees[category].append(df_sorted_nouns['text'][idx])
+                #     idx += 1
+                # else:
+                #     award_nominees[category].append('')
 
     print(award_nominees)
     print(time.time() - t)

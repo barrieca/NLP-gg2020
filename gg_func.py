@@ -357,6 +357,12 @@ def get_awards_helper(data_file_path):
 
     df_tweets = pd.DataFrame(json_data[0], columns=['text'])
 
+    # Remove substrings from tweets
+    df_tweets['text'] = df_tweets['text'].str.replace('#|@|RT', '') # remove hashtags
+    df_tweets['text'] = df_tweets['text'].str.replace('http\S+|www.\S+', '') # remove urls
+    df_tweets['text'] = df_tweets['text'].str.replace('[G|g]olden\\s?[G|g]lobes', '') # remove golden globes
+    df_tweets['text'] = df_tweets['text'].str.replace('fuck|damn|shit', '') # remove profanity
+
     df_nominee_tweets = filter_tweets(df_tweets, 'win|won|goes to|congratulations|congrats|congratz')
 
     df_candidates = search_for_awards(df_nominee_tweets)
@@ -427,7 +433,7 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
         df_nominee_category_tweets = filter_by_category(df_nominee_tweets, category)
 
         # Subsample a fixed maximum number of tweets
-        num_tweets_to_sample = 700
+        num_tweets_to_sample = 500
         if len(df_nominee_category_tweets) > num_tweets_to_sample:
             df_nominee_category_tweets = df_nominee_category_tweets.sample(num_tweets_to_sample, replace=True)
 
@@ -442,7 +448,7 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
         print("found noun frequencies")
 
         # Filter out unwanted noun chunks
-        df_sorted_nouns = filter_tweets(df_sorted_nouns, 'first|tonight|one|hollywood|los angeles|beverly hills, day', True)
+        df_sorted_nouns = filter_tweets(df_sorted_nouns, 'congratulations|next year|first|tonight|one|hollywood|los angeles|beverly hills, day', True)
 
         # Produce the correct number of noun chunks that also exist on IMDb
         imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], num_possible_winner, awards_year, award_entity_type[category] == 'movie')
@@ -471,7 +477,7 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
     print(time.time() - t)
     return award_nominees
 
-def get_presenters_helper(data_file_path, award_names):
+def get_presenters_helper(data_file_path, award_names, awards_year):
     '''
     Determines the winner for each award based on dataset of tweets.
     :param data_file_path: Path to the JSON file of tweets.
@@ -494,6 +500,13 @@ def get_presenters_helper(data_file_path, award_names):
     # Split data into two dataframes: pre-show and after show starts
     pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
 
+    # Remove substrings from tweets
+    data['text'] = data['text'].str.replace('#|@|RT', '') # remove hashtags
+    data['text'] = data['text'].str.replace('http\S+|www.\S+', '') # remove urls
+    data['text'] = data['text'].str.replace('[G|g]olden\\s?[G|g]lobes', '') # remove golden globes
+    data['text'] = data['text'].str.replace('fuck|damn|shit', '') # remove profanity
+    data['text'] = data['text'].str.replace(awards_year + '|' + str(int(awards_year) - 1), '') # remove current and previous year
+
     data['text'] = data['text'].str.lower()
 
     # Filter tweets by subject string
@@ -506,7 +519,7 @@ def get_presenters_helper(data_file_path, award_names):
         df_presenter_category_tweets = filter_by_category(df_presenter_tweets, category)
 
         # Subsample a fixed maximum number of tweets
-        num_tweets_to_sample = 200
+        num_tweets_to_sample = 80
         if len(df_presenter_category_tweets) > num_tweets_to_sample:
             df_presenter_category_tweets = df_presenter_category_tweets.sample(num_tweets_to_sample, replace=True)
 
@@ -563,6 +576,13 @@ def get_winner_helper(data_file_path, award_names, awards_year):
     # Split data into two dataframes: pre-show and after show starts
     pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
 
+    # Remove substrings from tweets
+    data['text'] = data['text'].str.replace('#|@|RT', '') # remove hashtags
+    data['text'] = data['text'].str.replace('http\S+|www.\S+', '') # remove urls
+    data['text'] = data['text'].str.replace('[G|g]olden\\s?[G|g]lobes', '') # remove golden globes
+    data['text'] = data['text'].str.replace('fuck|damn|shit', '') # remove profanity
+    data['text'] = data['text'].str.replace(awards_year + '|' + str(int(awards_year) - 1), '') # remove current and previous year
+
     data['text'] = data['text'].str.lower()
 
     # Filter tweets by subject string
@@ -576,7 +596,7 @@ def get_winner_helper(data_file_path, award_names, awards_year):
         df_nominee_category_tweets = filter_by_category(df_nominee_tweets, category)
 
         # Subsample a fixed maximum number of tweets
-        num_tweets_to_sample = 250
+        num_tweets_to_sample = 150
         if len(df_nominee_category_tweets) > num_tweets_to_sample:
             df_nominee_category_tweets = df_nominee_category_tweets.sample(num_tweets_to_sample, replace=True)
 
@@ -610,7 +630,7 @@ def get_winner_helper(data_file_path, award_names, awards_year):
 
     return award_winners
 
-def get_best_dressed_helper(data_file_path):
+def get_best_dressed_helper(data_file_path, awards_year):
     '''
 
     :param data_file_path:
@@ -626,6 +646,13 @@ def get_best_dressed_helper(data_file_path):
 
     # Split data into two dataframes: pre-show and after show starts
     pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
+
+    # Remove substrings from tweets
+    data['text'] = data['text'].str.replace('#|@|RT', '') # remove hashtags
+    data['text'] = data['text'].str.replace('http\S+|www.\S+', '') # remove urls
+    data['text'] = data['text'].str.replace('[G|g]olden\\s?[G|g]lobes', '') # remove golden globes
+    data['text'] = data['text'].str.replace('fuck|damn|shit', '') # remove profanity
+    data['text'] = data['text'].str.replace(awards_year + '|' + str(int(awards_year) - 1), '') # remove current and previous year
 
     data['text'] = data['text'].str.lower()
 
@@ -771,7 +798,7 @@ entity_type_to_imdb_type = {'person': 'name', 'tv': 'title', 'movie': 'title'}
 
 noun_chunk_stop_words = {'i', 'you', 'golden globe', 'golden globes', 'goldenglobes', 'congratulations', '#', 'the golden globes', 'a golden globe', 'the golden globe', 'he', 'she', 'me', 'who', 'they', 'it', 'golden globes 2020', 'goldenglobes2020', 'golden globe award', '#goldenglobes2020', 'globes', '@goldenglobes', 'golden globe awards', 'goldenglobe'}
 
-def main():
+# def main():
 
     # Read in JSON data
     # data = [json.loads(line) for line in open('gg2020.json','r',encoding='utf-8')]
@@ -781,7 +808,7 @@ def main():
     #
     # print(get_hosts_helper(data))
 
-     get_best_dressed_helper('gg2013.json')
+     # get_best_dressed_helper('gg2013.json')
 #     # print(filter_tweets(data, 'present').size)
 #     print(get_presenters_helper(data))
 

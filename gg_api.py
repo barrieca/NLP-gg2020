@@ -66,7 +66,7 @@ def get_presenters(year):
     award_names = OFFICIAL_AWARDS_1315 if int(year) < 2016 else OFFICIAL_AWARDS_1819
 
     # Your code here
-    return gg.get_presenters_helper(data_file_path, award_names)
+    return gg.get_presenters_helper(data_file_path, award_names, year)
 
 def pre_ceremony():
     '''This function loads/fetches/processes any data your program

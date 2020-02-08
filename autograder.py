@@ -221,8 +221,8 @@ def main(years, grading):
             del scores[y]['winner']['completeness']
     pprint(scores)
 
-    for year in years:
-        gg_api.get_sentiment(year)
+    # for year in years:
+    #     #     gg_api.get_sentiment(year)
 
 
 if __name__ == '__main__':

@@ -10,6 +10,29 @@ import time
 import numpy as np
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
+data = None
+is_input_data_found = False
+
+def process_input_data(data_file_path):
+    global data
+    global is_input_data_found
+
+    # Read in JSON data
+    json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
+
+    pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
+
+    # Remove substrings from tweets
+    data['text'] = data['text'].str.replace('#|@|RT', '') # remove hashtags
+    data['text'] = data['text'].str.replace('http\S+|www.\S+', '') # remove urls
+    data['text'] = data['text'].str.replace('[G|g]olden\\s?[G|g]lobes', '') # remove golden globes
+    data['text'] = data['text'].str.replace('fuck|damn|shit', '') # remove profanity
+
+    # Lowercase all the tweets
+    data['text'] = data['text'].str.lower()
+
+    is_input_data_found = True
+
 def find_truncated_candidates(df, search_type, min=1):
     '''
     Finds a statistically truncated list of candidates that are in IMDb.
@@ -62,6 +85,8 @@ def find_imdb_objects(df, search_type, n=1, year=0, is_movie=False, fuzzy_thresh
             else:
                 if len(result) > 0 and fuzzy_match(result[0][search_type], noun, fuzzy_threshold):
                     results.append((result[0][search_type], row['freq']))
+                    df = filter_tweets(df, noun[:5], True)
+                    df = filter_tweets(df, noun[-5:], True)
         if len(results) >= n:
             break
     return results
@@ -127,8 +152,6 @@ def create_noun_chunks(df_tweet):
     :param df_tweet: A dataframe of tweets with the column 'text'.
     :return: Returns a dataframe of the noun chunks in the tweet text.
     '''
-    # Instantiate spacy
-    nlp = spacy.load('en_core_web_sm')
 
     df_tweet = df_tweet['text'].apply(lambda x: [*nlp(x).ents])
 
@@ -316,11 +339,9 @@ def get_hosts_helper(data_file_path):
     print("processing host...")
     t = time.time()
 
-    # Read in JSON data
-    json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
-
-    # Split data into two dataframes: pre-show and after show starts
-    pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
+    # Ensure that the data has been read in and processed properly
+    if not is_input_data_found:
+        process_input_data(data_file_path)
 
     # Filter the tweets to find ones containing references to host
     df_filtered_tweets = filter_tweets(data, 'host')
@@ -350,18 +371,11 @@ def get_awards_helper(data_file_path):
     print("processing award names...")
     t = time.time()
 
-    # Read in JSON data
-    json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
+    # Ensure that the data has been read in and processed properly
+    if not is_input_data_found:
+        process_input_data(data_file_path)
 
-    df_tweets = pd.DataFrame(json_data[0], columns=['text'])
-
-    # Remove substrings from tweets
-    df_tweets['text'] = df_tweets['text'].str.replace('#|@|RT', '') # remove hashtags
-    df_tweets['text'] = df_tweets['text'].str.replace('http\S+|www.\S+', '') # remove urls
-    df_tweets['text'] = df_tweets['text'].str.replace('[G|g]olden\\s?[G|g]lobes', '') # remove golden globes
-    df_tweets['text'] = df_tweets['text'].str.replace('fuck|damn|shit', '') # remove profanity
-
-    df_nominee_tweets = filter_tweets(df_tweets, 'win|won|goes to|congratulations|congrats|congratz')
+    df_nominee_tweets = filter_tweets(data, 'win|won|goes to|congratulations|congrats|congratz')
 
     df_candidates = search_for_awards(df_nominee_tweets)
 
@@ -397,21 +411,9 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
     award_nominees = {}
     award_entity_type = dict(map(entity_typer, award_names))
 
-    # Read in JSON data
-    json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
-
-    # Split data into two dataframes: pre-show and after show starts
-    pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
-
-    # Remove substrings from tweets
-    data['text'] = data['text'].str.replace('#|@|RT', '') # remove hashtags
-    data['text'] = data['text'].str.replace('http\S+|www.\S+', '') # remove urls
-    data['text'] = data['text'].str.replace('[G|g]olden\\s?[G|g]lobes', '') # remove golden globes
-    data['text'] = data['text'].str.replace('fuck|damn|shit', '') # remove profanity
-    data['text'] = data['text'].str.replace(awards_year + '|' + str(int(awards_year) - 1), '') # remove current and previous year
-
-    # Lowercase all the tweets
-    data['text'] = data['text'].str.lower()
+    # Ensure that the data has been read in and processed properly
+    if not is_input_data_found:
+        process_input_data(data_file_path)
 
     # Filter tweets by subject string
     # Potential things to add: why, underdog, acknowledge
@@ -420,32 +422,32 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
     # For each award category
     for category in award_names:
 
-        print("processing nominees for " + str(category))
+        # print("processing nominees for " + str(category))
 
         # Filter based on the award category
         df_nominee_category_tweets = filter_by_category(df_nominee_tweets, category)
 
         # Subsample a fixed maximum number of tweets
-        num_tweets_to_sample = 400
+        num_tweets_to_sample = 200
         if len(df_nominee_category_tweets) > num_tweets_to_sample:
             df_nominee_category_tweets = df_nominee_category_tweets.sample(num_tweets_to_sample, replace=True)
 
-        print("filtered nominee tweets | " + str(df_nominee_category_tweets.size)) # TODO: remove before submitting
+        # print("filtered nominee tweets | " + str(df_nominee_category_tweets.size)) # TODO: remove before submitting
 
         # Get the nouns chunks in the remaining tweets
         df_noun_chunks = create_noun_chunks(df_nominee_category_tweets)
-        print("found noun chunks") # TODO: remove before submitting
+        # print("found noun chunks") # TODO: remove before submitting
 
         # Aggregate and sort the noun chunks
         df_sorted_nouns = get_noun_frequencies(df_noun_chunks)
-        print("found noun frequencies") # TODO: remove before submitting
+        # print("found noun frequencies") # TODO: remove before submitting
 
         # Filter out unwanted noun chunks
-        df_sorted_nouns = filter_tweets(df_sorted_nouns, 'congratulations|next year|first|tonight|one|hollywood|los angeles|beverly hills, day', True)
+        df_sorted_nouns = filter_tweets(df_sorted_nouns, 'congrat|next year|first|tonight|one|hollywood|los angeles|beverly hills, day', True)
 
         # Produce the correct number of noun chunks that also exist on IMDb
-        imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], num_possible_winner, awards_year, award_entity_type[category] == 'movie')
-        print("found imdb candidates") # TODO: remove before submitting
+        imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], num_possible_winner, awards_year, award_entity_type[category] == 'movie', fuzzy_threshold=0.4)
+        # print("found imdb candidates") # TODO: remove before submitting
 
         # Store winner
         award_nominees[category] = [nominee[0] for nominee in imdb_candidates[1:num_possible_winner]]
@@ -487,20 +489,9 @@ def get_presenters_helper(data_file_path, award_names, awards_year):
     award_presenters = {}
     award_entity_type = dict(map(entity_typer, award_names))
 
-    # Read in JSON data
-    json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
-
-    # Split data into two dataframes: pre-show and after show starts
-    pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
-
-    # Remove substrings from tweets
-    data['text'] = data['text'].str.replace('#|@|RT', '') # remove hashtags
-    data['text'] = data['text'].str.replace('http\S+|www.\S+', '') # remove urls
-    data['text'] = data['text'].str.replace('[G|g]olden\\s?[G|g]lobes', '') # remove golden globes
-    data['text'] = data['text'].str.replace('fuck|damn|shit', '') # remove profanity
-    data['text'] = data['text'].str.replace(awards_year + '|' + str(int(awards_year) - 1), '') # remove current and previous year
-
-    data['text'] = data['text'].str.lower()
+    # Ensure that the data has been read in and processed properly
+    if not is_input_data_found:
+        process_input_data(data_file_path)
 
     # Filter tweets by subject string
     df_presenter_tweets = filter_tweets(data, 'present|giv|hand|introduc')
@@ -516,19 +507,19 @@ def get_presenters_helper(data_file_path, award_names, awards_year):
         if len(df_presenter_category_tweets) > num_tweets_to_sample:
             df_presenter_category_tweets = df_presenter_category_tweets.sample(num_tweets_to_sample, replace=True)
 
-        print("filtered presenter tweets | " + str(df_presenter_category_tweets.size)) # TODO: remove before submitting
+        # print("filtered presenter tweets | " + str(df_presenter_category_tweets.size)) # TODO: remove before submitting
 
         # Get the nouns chunks in the remaining tweets
         df_noun_chunks = create_noun_chunks(df_presenter_category_tweets)
-        print("found noun chunks") # TODO: remove before submitting
+        # print("found noun chunks") # TODO: remove before submitting
 
         # Aggregate and sort the noun chunks
         df_sorted_nouns = get_noun_frequencies(df_noun_chunks)
-        print("found noun frequencies") # TODO: remove before submitting
+        # print("found noun frequencies") # TODO: remove before submitting
 
         # Produce the correct number of noun chunks that also exist on IMDb
         imdb_candidates = find_imdb_objects(df_sorted_nouns, 'name', num_possible_presenters, fuzzy_threshold=0.5)
-        print("found imdb candidates") # TODO: remove before submitting
+        # print("found imdb candidates") # TODO: remove before submitting
 
         # Store winner
         award_presenters[category] = statistical_truncation(imdb_candidates, 0.6, 1)
@@ -563,27 +554,16 @@ def get_winner_helper(data_file_path, award_names, awards_year):
     award_winners = {}
     award_entity_type = dict(map(entity_typer, award_names))
 
-    # Read in JSON data
-    json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
-
-    # Split data into two dataframes: pre-show and after show starts
-    pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
-
-    # Remove substrings from tweets
-    data['text'] = data['text'].str.replace('#|@|RT', '') # remove hashtags
-    data['text'] = data['text'].str.replace('http\S+|www.\S+', '') # remove urls
-    data['text'] = data['text'].str.replace('[G|g]olden\\s?[G|g]lobes', '') # remove golden globes
-    data['text'] = data['text'].str.replace('fuck|damn|shit', '') # remove profanity
-    data['text'] = data['text'].str.replace(awards_year + '|' + str(int(awards_year) - 1), '') # remove current and previous year
-
-    data['text'] = data['text'].str.lower()
+    # Ensure that the data has been read in and processed properly
+    if not is_input_data_found:
+        process_input_data(data_file_path)
 
     # Filter tweets by subject string
     df_nominee_tweets = filter_tweets(data, 'win|won|goes to|congratulations|congrats|congratz')
 
     # For each award category
     for category in award_names:
-        print("processing nominees for " + str(category))
+        # print("processing nominees for " + str(category))
 
         # Filter based on the award category
         df_nominee_category_tweets = filter_by_category(df_nominee_tweets, category)
@@ -593,19 +573,19 @@ def get_winner_helper(data_file_path, award_names, awards_year):
         if len(df_nominee_category_tweets) > num_tweets_to_sample:
             df_nominee_category_tweets = df_nominee_category_tweets.sample(num_tweets_to_sample, replace=True)
 
-        print("filtered winner tweets | " + str(df_nominee_category_tweets.size)) # TODO: remove before submitting
+        # print("filtered winner tweets | " + str(df_nominee_category_tweets.size)) # TODO: remove before submitting
 
         # Get the nouns chunks in the remaining tweets
         df_noun_chunks = create_noun_chunks(df_nominee_category_tweets)
-        print("found noun chunks") # TODO: remove before submitting
+        # print("found noun chunks") # TODO: remove before submitting
 
         # Aggregate and sort the noun chunks
         df_sorted_nouns = get_noun_frequencies(df_noun_chunks)
-        print("found noun frequencies") # TODO: remove before submitting
+        # print("found noun frequencies") # TODO: remove before submitting
 
         # Produce the correct number of noun chunks that also exist on IMDb
         imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], num_possible_winner, awards_year, award_entity_type[category] == 'movie')
-        print("found imdb candidates") # TODO: remove before submitting
+        # print("found imdb candidates") # TODO: remove before submitting
 
         # Store winner
         try:
@@ -634,23 +614,11 @@ def get_best_dressed_helper(data_file_path, awards_year):
     print("processing best dressed...")
     t = time.time()
 
-    # Read in JSON data
-    json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
-
-    # Split data into two dataframes: pre-show and after show starts
-    pre_data, data = split_data_by_time(json_data, pd.to_datetime('2020-01-06T01:00:00'))
-
-    # Remove substrings from tweets
-    data['text'] = data['text'].str.replace('#|@|RT', '') # remove hashtags
-    data['text'] = data['text'].str.replace('http\S+|www.\S+', '') # remove urls
-    data['text'] = data['text'].str.replace('[G|g]olden\\s?[G|g]lobes', '') # remove golden globes
-    data['text'] = data['text'].str.replace('fuck|damn|shit', '') # remove profanity
-    data['text'] = data['text'].str.replace(awards_year + '|' + str(int(awards_year) - 1), '') # remove current and previous year
-
-    data['text'] = data['text'].str.lower()
+    # Ensure that the data has been read in and processed properly
+    if not is_input_data_found:
+        process_input_data(data_file_path)
 
     # find all the dressing related tweets
-
     df_clothes_tweets = filter_tweets(data, 'nice|awful|ew|good|great|fine|hot|ugly|bad|horrible|best|worst|fab|stun|glow|damn')
     df_clothes_tweets = filter_tweets(df_clothes_tweets, 'wear|dress|came in|sport')
 
@@ -662,11 +630,10 @@ def get_best_dressed_helper(data_file_path, awards_year):
         df_clothes_tweets = df_clothes_tweets.sample(1500, replace=True)
 
     # get sentiment scores for all tweets
-
     df_clothes_tweets = get_sentiments_for_all_tweets(df_clothes_tweets)
     df_clothes_tweets['controversy_score'] = df_clothes_tweets['sentiment'].apply(np.sign)
 
-    print(df_clothes_tweets.size) # TODO: remove before submitting
+    # print(df_clothes_tweets.size) # TODO: remove before submitting
 
     # find the most often occurring entities among the tweets
     df_noun_chunks = create_noun_chunks(df_clothes_tweets)
@@ -681,11 +648,9 @@ def get_best_dressed_helper(data_file_path, awards_year):
     people_list = find_imdb_objects(df_sorted_nouns, 'name', 20)
 
     # Get average sentiment score for each person
-
     sentiment_scores = get_average_sentiment_scores(df_clothes_tweets, people_list)
 
     # Sort list of people-sentiment scores
-
     sentiment_scores = sorted(sentiment_scores, key=lambda x: x[1], reverse=True)
 
     controversial_scores = get_controversial_sentiment_scores(df_clothes_tweets, people_list)
@@ -790,6 +755,9 @@ def entity_typer(award_name):
 entity_type_to_imdb_type = {'person': 'name', 'tv': 'title', 'movie': 'title'}
 
 noun_chunk_stop_words = {'i', 'you', 'golden globe', 'golden globes', 'goldenglobes', 'congratulations', '#', 'the golden globes', 'a golden globe', 'the golden globe', 'he', 'she', 'me', 'who', 'they', 'it', 'golden globes 2020', 'goldenglobes2020', 'golden globe award', '#goldenglobes2020', 'globes', '@goldenglobes', 'golden globe awards', 'goldenglobe'}
+
+# Instantiate spacy
+nlp = spacy.load('en_core_web_sm')
 
 # def main():
 

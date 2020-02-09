@@ -74,6 +74,8 @@ def find_imdb_objects(df, search_type, n=1, year=0, is_movie=False, fuzzy_thresh
                         for candidate in imdb_candidates:
                             if fuzzy_match(candidate.lower(), noun, fuzzy_threshold):
                                 results.append((candidate,row['freq']))
+                                df = filter_tweets(df, noun[:5], True)
+                                df = filter_tweets(df, noun[-5:], True)
                 else:
                     imdb_candidates = [object['title'] for object in result if (object['kind'] == 'tv series' or object['kind'] == 'tv mini series' or object['kind'] == 'tv movie') and
                                        'year' in object and
@@ -82,6 +84,8 @@ def find_imdb_objects(df, search_type, n=1, year=0, is_movie=False, fuzzy_thresh
                         for candidate in imdb_candidates:
                             if fuzzy_match(candidate.lower(), noun, fuzzy_threshold):
                                 results.append((candidate, row['freq']))
+                                df = filter_tweets(df, noun[:5], True)
+                                df = filter_tweets(df, noun[-5:], True)
             else:
                 if len(result) > 0 and fuzzy_match(result[0][search_type], noun, fuzzy_threshold):
                     results.append((result[0][search_type], row['freq']))

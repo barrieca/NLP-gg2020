@@ -2,7 +2,6 @@ import collections
 import imdb
 import json
 import Levenshtein
-import os
 import pandas as pd
 import re
 import spacy
@@ -222,7 +221,7 @@ def search_for_awards(df_tweets):
     phrases = phrases[~phrases[0].str.contains('golden ?globe', case=False, regex=True)]
     return pd.DataFrame([candidate.lower() for candidate in phrases[0]], columns=['text'])
 
-def sentiment_analysis_helper(data_file_path, awards, year):
+def sentiment_analysis_helper(data_file_path, awards, year, winners):
     '''
     Function called by gg_api for analyzing sentiment.
     :param data_file_path: Path to the JSON file of tweets.
@@ -234,12 +233,6 @@ def sentiment_analysis_helper(data_file_path, awards, year):
     json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
 
     df_tweets = pd.DataFrame(json_data[0], columns=['text'])
-
-    if not os.path.exists('winners' + str(year) + '.csv'):
-        get_winner_helper(data_file_path, awards, year).values()
-
-    with open('winners' + str(year) + '.csv') as winners_file:
-        winners = [winner[:-1] for winner in winners_file.readlines()]
 
     sentiment = get_sentiment_scores(df_tweets, winners)
     sentiment = {subject: sentiment[subject]['compound'] for subject in sentiment.keys()}
@@ -612,11 +605,6 @@ def get_winner_helper(data_file_path, award_names, awards_year):
         except:
             award_winners[category] = ''
         # print("found the award winner")
-
-    winners_file = open('winners' + str(awards_year) + '.csv', 'a')
-    for winner in award_winners.values():
-        winners_file.write(winner + '\n')
-    winners_file.close()
 
     print(time.time() - t) # TODO: remove before submitting
 

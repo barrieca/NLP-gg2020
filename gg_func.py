@@ -49,7 +49,7 @@ def is_valid_movie_year(test_year, award_year):
 def is_valid_series_year(test_year, award_year):
     return test_year != '????' and int(test_year) >= int(award_year)-15 and int(test_year) < int(award_year)
 
-def find_imdb_objects(df, search_type, n=1, year=0, is_movie=False, fuzzy_threshold=0.25):
+def find_imdb_objects(df, search_type, n=1, year=0, is_movie=False, fuzzy_threshold=0.25, query_limit=10000):
     '''
     Returns list of tuples of n noun chunks that were successfully found on IMDb, and their frequency.
     :param df: DataFrame of sorted nouns
@@ -61,36 +61,49 @@ def find_imdb_objects(df, search_type, n=1, year=0, is_movie=False, fuzzy_thresh
     imdb_obj = imdb.IMDb()
     search_function = (imdb_obj.search_person if search_type == 'name' else imdb_obj.search_movie)
     results = []
+    num_queries_performed = 0
     for i, row in df.iterrows():
         noun = row['text']
-        result = search_function(noun)
-        if not any(possible[search_type] in results_elt for results_elt in results for possible in result): # get rid of duplicates
-            if search_type == 'title':
-                if is_movie:
-                    imdb_candidates = [object['long imdb title'][:-7] for object in result if object['kind'] == 'movie' and
-                                       'year' in object and
-                                       is_valid_movie_year(object['year'], year)]
-                    if imdb_candidates:
-                        for candidate in imdb_candidates:
-                            if fuzzy_match(candidate.lower(), noun, fuzzy_threshold):
-                                results.append((candidate,row['freq']))
-                                df = filter_tweets(df, noun[:5], True)
-                                df = filter_tweets(df, noun[-5:], True)
-                else:
-                    imdb_candidates = [object['title'] for object in result if (object['kind'] == 'tv series' or object['kind'] == 'tv mini series' or object['kind'] == 'tv movie') and
-                                       'year' in object and
-                                       is_valid_series_year(object['year'], year)]
-                    if imdb_candidates:
-                        for candidate in imdb_candidates:
-                            if fuzzy_match(candidate.lower(), noun, fuzzy_threshold):
-                                results.append((candidate, row['freq']))
-                                df = filter_tweets(df, noun[:5], True)
-                                df = filter_tweets(df, noun[-5:], True)
+        try:
+            if num_queries_performed < query_limit:
+                # Try searching IMDb
+                result = search_function(noun)
+                if not any(possible[search_type] in results_elt for results_elt in results for possible in result): # get rid of duplicates
+                    if search_type == 'title':
+                        if is_movie:
+                            imdb_candidates = [object['long imdb title'][:-7] for object in result if object['kind'] == 'movie' and
+                                               'year' in object and
+                                               is_valid_movie_year(object['year'], year)]
+                            if imdb_candidates:
+                                for candidate in imdb_candidates:
+                                    if fuzzy_match(candidate.lower(), noun, fuzzy_threshold):
+                                        results.append((candidate,row['freq']))
+                                        df = filter_tweets(df, noun[:5], True)
+                                        df = filter_tweets(df, noun[-5:], True)
+                        else:
+                            imdb_candidates = [object['title'] for object in result if (object['kind'] == 'tv series' or object['kind'] == 'tv mini series' or object['kind'] == 'tv movie') and
+                                               'year' in object and
+                                               is_valid_series_year(object['year'], year)]
+                            if imdb_candidates:
+                                for candidate in imdb_candidates:
+                                    if fuzzy_match(candidate.lower(), noun, fuzzy_threshold):
+                                        results.append((candidate, row['freq']))
+                                        df = filter_tweets(df, noun[:5], True)
+                                        df = filter_tweets(df, noun[-5:], True)
+                    else:
+                        if len(result) > 0 and fuzzy_match(result[0][search_type], noun, fuzzy_threshold):
+                            results.append((result[0][search_type], row['freq']))
+                            df = filter_tweets(df, noun[:5], True)
+                            df = filter_tweets(df, noun[-5:], True)
             else:
-                if len(result) > 0 and fuzzy_match(result[0][search_type], noun, fuzzy_threshold):
-                    results.append((result[0][search_type], row['freq']))
-                    df = filter_tweets(df, noun[:5], True)
-                    df = filter_tweets(df, noun[-5:], True)
+                results.append((noun, row['freq']))
+                df = filter_tweets(df, noun[:5], True)
+                df = filter_tweets(df, noun[-5:], True)
+        except Exception as inst:
+            # Catch any errors that might occur when connecting to IMDb database.
+            results.append((noun, row['freq']))
+            df = filter_tweets(df, noun[:5], True)
+            df = filter_tweets(df, noun[-5:], True)
         if len(results) >= n:
             break
     return results
@@ -452,7 +465,7 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
         df_sorted_nouns = filter_tweets(df_sorted_nouns, 'congrat|next year|first|tonight|one|hollywood|los angeles|beverly hills, day', True)
 
         # Produce the correct number of noun chunks that also exist on IMDb
-        imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], num_possible_winner, awards_year, award_entity_type[category] == 'movie', fuzzy_threshold=0.4)
+        imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], num_possible_winner, awards_year, award_entity_type[category] == 'movie', fuzzy_threshold=0.4, query_limit=5)
         # print("found imdb candidates") # TODO: remove before submitting
 
         # Store winner

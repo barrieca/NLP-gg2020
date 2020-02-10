@@ -115,6 +115,16 @@ def get_sentiment(year):
 
     return
 
+def get_best_dressed(year):
+    # Get the path to the correct tweets based on the year
+    data_file_path = 'gg' + str(year) + '.json'
+
+    # Your code here
+    gg.get_best_dressed_helper(data_file_path, year)
+
+    return
+
+
 def main():
     '''This function calls your program. Typing "python gg_api.py"
     will run this function. Or, in the interpreter, import gg_api

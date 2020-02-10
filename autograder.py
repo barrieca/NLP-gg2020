@@ -214,15 +214,19 @@ def main(years, grading):
         for g in grading:
             if g in ['hosts', 'awards']:
                 scores[y][g]['spelling'], scores[y][g]['completeness'] = score_unstructured(y, answers, g)
-            else:
+            elif g in ['nominees', 'presenters', 'winner' ]:
                 scores[y][g]['spelling'], scores[y][g]['completeness'] = score_structured(y, answers, g)
+            else:
+                continue
 
         if "winner" in grading:
             del scores[y]['winner']['completeness']
     pprint(scores)
 
-    # for year in years:
-    #     #     gg_api.get_sentiment(year)
+    # Running the additional goals
+    for year in years:
+        gg_api.get_best_dressed(year)
+        # gg_api.get_sentiment(year)
 
 
 if __name__ == '__main__':

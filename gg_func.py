@@ -26,7 +26,7 @@ def process_input_data(data_file_path):
     data['text'] = data['text'].str.replace('#|@|RT', '') # remove hashtags
     data['text'] = data['text'].str.replace('http\S+|www.\S+', '') # remove urls
     data['text'] = data['text'].str.replace('[G|g]olden\\s?[G|g]lobes', '') # remove golden globes
-    data['text'] = data['text'].str.replace('fuck|damn|shit', '') # remove profanity
+    data['text'] = data['text'].str.replace('fuck|shit', '') # remove profanity
 
     # Lowercase all the tweets
     data['text'] = data['text'].str.lower()
@@ -211,10 +211,12 @@ def search_for_awards(df_tweets):
 
 def sentiment_analysis_helper(data_file_path, awards, year):
     '''
-    Function calleb by gg_api for analyzing sentiment.
+    Function called by gg_api for analyzing sentiment.
     :param data_file_path: Path to the JSON file of tweets.
     :return: Dictionary of people and the analyzed sentiment scores with respect to each person.
     '''
+
+    print('processing winner sentiment analysis')
 
     json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
 
@@ -465,12 +467,12 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
             df_sorted_nouns.reset_index(inplace=True, drop=True)
 
             while len(award_nominees[category]) < num_possible_winner-1:
-                award_nominees[category].append(appendees[len(award_nominees[category])])
-                # if idx < len(df_sorted_nouns):
-                #     award_nominees[category].append(df_sorted_nouns['text'][idx])
-                #     idx += 1
-                # else:
-                #     award_nominees[category].append('')
+                # award_nominees[category].append(appendees[len(award_nominees[category])])
+                if idx < len(df_sorted_nouns):
+                    award_nominees[category].append(df_sorted_nouns['text'][idx])
+                    idx += 1
+                else:
+                    award_nominees[category].append('')
 
     # print(award_nominees)
     print(time.time() - t) # TODO: remove before submitting

@@ -25,11 +25,30 @@ This project utilizes a variety of Python 3 packages in order to perform its ana
 - VaderSentiment (for sentiment analysis)
   - Installation: `pip install vaderSentiment`
   - Webpage: https://github.com/cjhutto/vaderSentiment
+  
+Note that a full list of all packages installed can be found in requirements.txt.
 
 ## Running the Project
 
-TODO: instructions on what file(s) to run,
+This project can be executed by running the autograder as follows:
 
+`python autograder.py <year>`
+
+The runtime can be found by adding pre-pending this with the `time` command:
+
+`time python autograder.py <year>`
+
+This will perform the tweets analysis to find hosts, awards, nominees, presenters, winners, sentiment 
+analysis of tweets about the award winners, best dressed, worst dressed, and most controversially 
+dressed. The final output is provided in a human readable format via the output console/terminal.
+Note that for the additional goals, two function calls were added to `main` in the autograder.
+These should automatically run for the year given as input and provide output via the console/terminal
+
+Note that this project requires an active internet connection in order to properly query the IMDb database.
+
+### Runtime
+On our computers, running the five required analyses takes roughly 7m20s. Adding the analysis for the
+additional goals brings the total runtime up to roughly 8m, which is still below the time limit of 10m.
 
 ## Analysis Approach
 At a high level, our approach to performing analysis for each of the goals is relatively similar.
@@ -75,7 +94,7 @@ from the set of most probable candidates, the set of probable entities undergoes
 groups together candidates that are similar to each other, or substrings of each other, in order to prevent
 duplicate award categories from being reported as part of our final results.
 
-### Detecting Sentiment (EC)
+### Detecting Sentiment (Additional Goal)
 The sentiment_analysis_helper function is called from the main function of
 autograder.py. The return value of this function is then printed. As it is
 implemented, the results of this feature are meant to convey the overall
@@ -88,4 +107,4 @@ that gets output by the get_winner function. If this csv file is not found, it
 will be recreated (which will be time consuming).
 
 
-### Detecting the Best, Worst, and Most Controversially Dressed (EC)
+### Detecting the Best, Worst, and Most Controversially Dressed (Additional Goal)

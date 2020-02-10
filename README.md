@@ -106,5 +106,19 @@ requirement functions are called. Specifically, this feature requires a csv file
 that gets output by the get_winner function. If this csv file is not found, it
 will be recreated (which will be time consuming).
 
-
 ### Detecting the Best, Worst, and Most Controversially Dressed (Additional Goal)
+To determine the best, worst, and most controversially dressed people in the award
+show, we use sentiment analysis on clothes related tweets. To find the best and
+worst dressed, we take the total sentiment score for each of the top 20 most
+mentioned people in those tweets. We then weigh those scores against their total
+number of mentions instead of taking a strict average, because we considered
+many mentions to be indicative of good (or bad) dress. That gives each person
+their own sentiment score, so we take the first and last person in a sorted
+list of scores and proclaim them the best and worst dressed respectively.
+
+We follow a similar path to find the most controversially dressed. Instead of
+taking the total sentiment score, we only use the tweets that have a non-neutral
+sentiment score, and label each of those tweets by their sentiment sign.
+We then divide this score by their total mentions. We then take the absolute
+value of those scores to find the person who has a controversy score nearest
+0, as this is the person with most split sentiments.

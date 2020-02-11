@@ -21,6 +21,7 @@ This project utilizes a variety of Python 3 packages in order to perform its ana
   - Webpage: https://pandas.pydata.org/
 - Spacy (for general NLP tasks)
   - Installation: `pip install -U spacy`
+  - We use the `en_core_web_sm` model, which can be installed with `python -m spacy download en_core_web_sm` after installing Spacy.
   - Webpage: https://spacy.io/
 - VaderSentiment (for sentiment analysis)
   - Installation: `pip install vaderSentiment`
@@ -48,7 +49,7 @@ Note that this project requires an active internet connection in order to proper
 
 ### Runtime
 On our computers, running the five required analyses takes roughly 7m20s. Adding the analysis for the
-additional goals brings the total runtime up to roughly 8m, which is still below the time limit of 10m.
+additional goals brings the total runtime up to roughly 8m30s, which is still below the time limit of 10m.
 
 ## Analysis Approach
 At a high level, our approach to performing analysis for each of the goals is relatively similar.
@@ -122,3 +123,8 @@ sentiment score, and label each of those tweets by their sentiment sign.
 We then divide this score by their total mentions. We then take the absolute
 value of those scores to find the person who has a controversy score nearest
 0, as this is the person with most split sentiments.
+
+## Randomness in the Results
+For most of the goals we analyze a random sampling of the input tweets in order to ensure that the program
+finishes in a timely manner. This introduces some amount of non-determinism in the final results, but the
+scores we get are relatively stable and run within the allotted time on our laptops.

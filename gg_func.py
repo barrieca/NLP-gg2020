@@ -232,13 +232,13 @@ def sentiment_analysis_helper(data_file_path, awards, year, winners):
     :return: Dictionary of people and the analyzed sentiment scores with respect to each person.
     '''
 
-    print('processing winner sentiment analysis')
-    t = time.time()
+    # print('processing winner sentiment analysis')
+    # t = time.time()
 
     # Ensure that the data has been read in and processed properly
     if not is_input_data_found:
         process_input_data(data_file_path)
-        print("reloaded data in sentiment analysis")
+        # print("reloaded data in sentiment analysis")
 
     df_tweets = filter_tweets(data, 'win|won')
     regex_string = '|'.join([x.lower() for x in winners])
@@ -247,9 +247,9 @@ def sentiment_analysis_helper(data_file_path, awards, year, winners):
     sentiment = get_sentiment_scores(df_tweets, winners)
     sentiment = {subject: sentiment[subject] for subject in sentiment.keys()}
 
-    print(time.time() - t)
+    # print(time.time() - t)
 
-    return sentiment
+    # return sentiment
 
 def get_sentiment_scores(df_tweets, subjects):
     '''

@@ -2,7 +2,6 @@ import collections
 import imdb
 import json
 import Levenshtein
-import os
 import pandas as pd
 import re
 import spacy
@@ -12,6 +11,9 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 data = None
 is_input_data_found = False
+
+analyzer = SentimentIntensityAnalyzer()
+imdb_obj = imdb.IMDb()
 
 def process_input_data(data_file_path):
     global data
@@ -58,7 +60,7 @@ def find_imdb_objects(df, search_type, n=1, year=0, is_movie=False, fuzzy_thresh
     :return:
     Possible criteria: imdb_obj.get_movie(object.movieID)['rating'] > 7.0
     '''
-    imdb_obj = imdb.IMDb()
+    # imdb_obj = imdb.IMDb()
     search_function = (imdb_obj.search_person if search_type == 'name' else imdb_obj.search_movie)
     results = []
     num_queries_performed = 0
@@ -222,29 +224,32 @@ def search_for_awards(df_tweets):
     phrases = phrases[~phrases[0].str.contains('golden ?globe', case=False, regex=True)]
     return pd.DataFrame([candidate.lower() for candidate in phrases[0]], columns=['text'])
 
-def sentiment_analysis_helper(data_file_path, awards, year):
+def sentiment_analysis_helper(data_file_path, awards, year, winners):
     '''
     Function called by gg_api for analyzing sentiment.
     :param data_file_path: Path to the JSON file of tweets.
+    :param winners List of winners
     :return: Dictionary of people and the analyzed sentiment scores with respect to each person.
     '''
 
-    print('processing winner sentiment analysis')
+    # print('processing winner sentiment analysis')
+    # t = time.time()
 
-    json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
+    # Ensure that the data has been read in and processed properly
+    if not is_input_data_found:
+        process_input_data(data_file_path)
+        # print("reloaded data in sentiment analysis")
 
-    df_tweets = pd.DataFrame(json_data[0], columns=['text'])
-
-    if not os.path.exists('winners' + str(year) + '.csv'):
-        get_winner_helper(data_file_path, awards, year).values()
-
-    with open('winners' + str(year) + '.csv') as winners_file:
-        winners = [winner[:-1] for winner in winners_file.readlines()]
+    df_tweets = filter_tweets(data, 'win|won')
+    regex_string = '|'.join([x.lower() for x in winners])
+    df_tweets = filter_tweets(df_tweets, regex_string)
 
     sentiment = get_sentiment_scores(df_tweets, winners)
-    sentiment = {subject: sentiment[subject]['compound'] for subject in sentiment.keys()}
+    sentiment = {subject: sentiment[subject] for subject in sentiment.keys()}
 
-    return sentiment
+    # print(time.time() - t)
+
+    # return sentiment
 
 def get_sentiment_scores(df_tweets, subjects):
     '''
@@ -253,18 +258,19 @@ def get_sentiment_scores(df_tweets, subjects):
     :param subjects: List of subjects (people, movies, etc.) about which to analyze sentiment.
     :return: Dictionary of people and the analyzed sentiment scores with respect to each person.
     '''
-    analyzer = SentimentIntensityAnalyzer()
+    # analyzer = SentimentIntensityAnalyzer()
     sentiment = {}
     for subject in subjects:
-        subject_tweets = filter_tweets(df_tweets, subject)['text']
-        sentiment_counter = collections.Counter()
-        # sentiment_counter.update(analyzer.polarity_scores(tweet)) for tweet in subject_tweets / len(subject_tweets)
-        for tweet in subject_tweets:
-            sentiment_counter.update(analyzer.polarity_scores(tweet))
-        sentiment[subject] = dict(sentiment_counter)
-        for score_type in sentiment[subject].keys():
-            sentiment[subject][score_type] /= len(subject_tweets)
+        subject_tweets = filter_tweets(df_tweets, subject.lower())
+        if len(subject_tweets) > 0:
+            df_tweets = df_tweets.sample(500, replace=True)
+            compound_count = 0
+            for i, row in subject_tweets.iterrows():
+                tweet = row['text']
+                compound_count += analyzer.polarity_scores(tweet)['compound']
+            sentiment[subject] = compound_count/len(subject_tweets)
     return sentiment
+
 
 def get_sentiments_for_all_tweets(df_tweets):
     '''
@@ -273,7 +279,7 @@ def get_sentiments_for_all_tweets(df_tweets):
     :return: a dataframe containing tweets in the text column and sentiment of the tweet in the sentiment column
     '''
     sentiment_list = []
-    analyzer = SentimentIntensityAnalyzer()
+    # analyzer = SentimentIntensityAnalyzer()
     for i, row in df_tweets.iterrows():
         tweet = row['text']
         sentiment_list.append(analyzer.polarity_scores(tweet)['compound'])
@@ -355,8 +361,8 @@ def get_hosts_helper(data_file_path):
     :param data_file_path: Path to the JSON file of tweets.
     :return:
     '''
-    print("processing host...")
-    t = time.time()
+    # print("processing host...")
+    # t = time.time()
 
     # Ensure that the data has been read in and processed properly
     if not is_input_data_found:
@@ -375,7 +381,7 @@ def get_hosts_helper(data_file_path):
     # Get the entities present in these tweets
     df_filtered_tweets = get_noun_frequencies(create_noun_chunks(df_filtered_tweets))
 
-    print(time.time() - t) # TODO: remove before submitting
+    # print(time.time() - t) # TODO: remove before submitting
 
     # Determine the most likely host, max 2 hosts
     return find_truncated_candidates(df_filtered_tweets, 'name', max_hosts)
@@ -387,8 +393,8 @@ def get_awards_helper(data_file_path):
     :return:
     '''
 
-    print("processing award names...")
-    t = time.time()
+    # print("processing award names...")
+    # t = time.time()
 
     # Ensure that the data has been read in and processed properly
     if not is_input_data_found:
@@ -402,7 +408,7 @@ def get_awards_helper(data_file_path):
     df_sorted_nouns = get_noun_frequencies(df_candidates)
     phrases = fuzzy_group(df_sorted_nouns, 27)
 
-    print(time.time() - t)
+    # print(time.time() - t)
 
     return phrases
 
@@ -422,8 +428,8 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
 
     '''
 
-    print("processing nominees...")
-    t = time.time()
+    # print("processing nominees...")
+    # t = time.time()
 
     # Define some useful parameters for processing
     num_possible_winner = 5
@@ -447,7 +453,7 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
         df_nominee_category_tweets = filter_by_category(df_nominee_tweets, category)
 
         # Subsample a fixed maximum number of tweets
-        num_tweets_to_sample = 200
+        num_tweets_to_sample = 300
         if len(df_nominee_category_tweets) > num_tweets_to_sample:
             df_nominee_category_tweets = df_nominee_category_tweets.sample(num_tweets_to_sample, replace=True)
 
@@ -488,7 +494,7 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
                     award_nominees[category].append('')
 
     # print(award_nominees)
-    print(time.time() - t) # TODO: remove before submitting
+    # print(time.time() - t) # TODO: remove before submitting
     return award_nominees
 
 def get_presenters_helper(data_file_path, award_names, awards_year):
@@ -500,8 +506,8 @@ def get_presenters_helper(data_file_path, award_names, awards_year):
     :return: A dictionary with the hard coded award names as keys, and each entry a list of strings denoting nominees.
     '''
 
-    print("processing presenters...")
-    t = time.time()
+    # print("processing presenters...")
+    # t = time.time()
 
     # Define some useful parameters for processing
     num_possible_presenters = 2
@@ -537,7 +543,7 @@ def get_presenters_helper(data_file_path, award_names, awards_year):
         # print("found noun frequencies") # TODO: remove before submitting
 
         # Produce the correct number of noun chunks that also exist on IMDb
-        imdb_candidates = find_imdb_objects(df_sorted_nouns, 'name', num_possible_presenters, fuzzy_threshold=0.5)
+        imdb_candidates = find_imdb_objects(df_sorted_nouns, 'name', num_possible_presenters, fuzzy_threshold=0.5, query_limit=5)
         # print("found imdb candidates") # TODO: remove before submitting
 
         # Store winner
@@ -545,7 +551,7 @@ def get_presenters_helper(data_file_path, award_names, awards_year):
         # print("found the award presenters")
 
     # print(award_presenters)
-    print(time.time() - t) # TODO: remove before submitting
+    # print(time.time() - t) # TODO: remove before submitting
     return award_presenters
 
 def get_winner_helper(data_file_path, award_names, awards_year):
@@ -565,8 +571,8 @@ def get_winner_helper(data_file_path, award_names, awards_year):
 
     # winners global (for use by other functions)
 
-    print("processing winner...")
-    t = time.time()
+    # print("processing winner...")
+    # t = time.time()
 
     # Define some useful parameters for processing
     num_possible_winner = 1
@@ -603,7 +609,7 @@ def get_winner_helper(data_file_path, award_names, awards_year):
         # print("found noun frequencies") # TODO: remove before submitting
 
         # Produce the correct number of noun chunks that also exist on IMDb
-        imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], num_possible_winner, awards_year, award_entity_type[category] == 'movie')
+        imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], num_possible_winner, awards_year, award_entity_type[category] == 'movie', query_limit=5)
         # print("found imdb candidates") # TODO: remove before submitting
 
         # Store winner
@@ -613,12 +619,7 @@ def get_winner_helper(data_file_path, award_names, awards_year):
             award_winners[category] = ''
         # print("found the award winner")
 
-    winners_file = open('winners' + str(awards_year) + '.csv', 'a')
-    for winner in award_winners.values():
-        winners_file.write(winner + '\n')
-    winners_file.close()
-
-    print(time.time() - t) # TODO: remove before submitting
+    # print(time.time() - t) # TODO: remove before submitting
 
     return award_winners
 
@@ -630,8 +631,8 @@ def get_best_dressed_helper(data_file_path, awards_year):
     :return:
     '''
 
-    print("processing best dressed...")
-    t = time.time()
+    # print("processing best dressed...")
+    # t = time.time()
 
     # Ensure that the data has been read in and processed properly
     if not is_input_data_found:
@@ -641,12 +642,13 @@ def get_best_dressed_helper(data_file_path, awards_year):
     df_clothes_tweets = filter_tweets(data, 'nice|awful|ew|good|great|fine|hot|ugly|bad|horrible|best|worst|fab|stun|glow|damn')
     df_clothes_tweets = filter_tweets(df_clothes_tweets, 'wear|dress|came in|sport')
 
-    print('filtered clothes tweets | ' + str(df_clothes_tweets.size)) # TODO: remove before submitting
+    # print('filtered clothes tweets | ' + str(df_clothes_tweets.size)) # TODO: remove before submitting
 
     # if too many tweets, sample 2000 with replacement
 
-    if df_clothes_tweets.size > 1500:
-        df_clothes_tweets = df_clothes_tweets.sample(1500, replace=True)
+    sample_size = 2500
+    if df_clothes_tweets.size > sample_size:
+        df_clothes_tweets = df_clothes_tweets.sample(sample_size, replace=True)
 
     # get sentiment scores for all tweets
     df_clothes_tweets = get_sentiments_for_all_tweets(df_clothes_tweets)
@@ -675,12 +677,14 @@ def get_best_dressed_helper(data_file_path, awards_year):
     controversial_scores = get_controversial_sentiment_scores(df_clothes_tweets, people_list)
 
     print('best dressed | '+str(sentiment_scores[0][0]))
-
     print('worst dressed | '+str(sentiment_scores[-1][0]))
-
     print('most controversially dressed | '+str(controversial_scores[0][0]))
 
-    print(time.time() - t) # TODO: remove before submitting
+    print('')
+
+    return
+
+    # print(time.time() - t) # TODO: remove before submitting
 
 def get_average_sentiment_scores(df, people_list):
     '''

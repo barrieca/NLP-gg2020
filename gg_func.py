@@ -12,6 +12,9 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 data = None
 is_input_data_found = False
 
+analyzer = SentimentIntensityAnalyzer()
+imdb_obj = imdb.IMDb()
+
 def process_input_data(data_file_path):
     global data
     global is_input_data_found
@@ -57,7 +60,7 @@ def find_imdb_objects(df, search_type, n=1, year=0, is_movie=False, fuzzy_thresh
     :return:
     Possible criteria: imdb_obj.get_movie(object.movieID)['rating'] > 7.0
     '''
-    imdb_obj = imdb.IMDb()
+    # imdb_obj = imdb.IMDb()
     search_function = (imdb_obj.search_person if search_type == 'name' else imdb_obj.search_movie)
     results = []
     num_queries_performed = 0
@@ -255,7 +258,7 @@ def get_sentiment_scores(df_tweets, subjects):
     :param subjects: List of subjects (people, movies, etc.) about which to analyze sentiment.
     :return: Dictionary of people and the analyzed sentiment scores with respect to each person.
     '''
-    analyzer = SentimentIntensityAnalyzer()
+    # analyzer = SentimentIntensityAnalyzer()
     sentiment = {}
     for subject in subjects:
         subject_tweets = filter_tweets(df_tweets, subject.lower())
@@ -275,7 +278,7 @@ def get_sentiments_for_all_tweets(df_tweets):
     :return: a dataframe containing tweets in the text column and sentiment of the tweet in the sentiment column
     '''
     sentiment_list = []
-    analyzer = SentimentIntensityAnalyzer()
+    # analyzer = SentimentIntensityAnalyzer()
     for i, row in df_tweets.iterrows():
         tweet = row['text']
         sentiment_list.append(analyzer.polarity_scores(tweet)['compound'])
@@ -449,7 +452,7 @@ def get_nominees_helper(data_file_path, award_names, awards_year):
         df_nominee_category_tweets = filter_by_category(df_nominee_tweets, category)
 
         # Subsample a fixed maximum number of tweets
-        num_tweets_to_sample = 200
+        num_tweets_to_sample = 300
         if len(df_nominee_category_tweets) > num_tweets_to_sample:
             df_nominee_category_tweets = df_nominee_category_tweets.sample(num_tweets_to_sample, replace=True)
 
@@ -642,8 +645,9 @@ def get_best_dressed_helper(data_file_path, awards_year):
 
     # if too many tweets, sample 2000 with replacement
 
-    if df_clothes_tweets.size > 1500:
-        df_clothes_tweets = df_clothes_tweets.sample(1500, replace=True)
+    sample_size = 2500
+    if df_clothes_tweets.size > sample_size:
+        df_clothes_tweets = df_clothes_tweets.sample(sample_size, replace=True)
 
     # get sentiment scores for all tweets
     df_clothes_tweets = get_sentiments_for_all_tweets(df_clothes_tweets)

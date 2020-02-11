@@ -225,17 +225,26 @@ def sentiment_analysis_helper(data_file_path, awards, year, winners):
     '''
     Function called by gg_api for analyzing sentiment.
     :param data_file_path: Path to the JSON file of tweets.
+    :param winners List of winners
     :return: Dictionary of people and the analyzed sentiment scores with respect to each person.
     '''
 
     print('processing winner sentiment analysis')
+    t = time.time()
 
-    json_data = [json.loads(line) for line in open(data_file_path,'r',encoding='utf-8')]
+    # Ensure that the data has been read in and processed properly
+    if not is_input_data_found:
+        process_input_data(data_file_path)
+        print("reloaded data in sentiment analysis")
 
-    df_tweets = pd.DataFrame(json_data[0], columns=['text'])
+    df_tweets = filter_tweets(data, 'win|won')
+    regex_string = '|'.join([x.lower() for x in winners])
+    df_tweets = filter_tweets(df_tweets, regex_string)
 
     sentiment = get_sentiment_scores(df_tweets, winners)
-    sentiment = {subject: sentiment[subject]['compound'] for subject in sentiment.keys()}
+    sentiment = {subject: sentiment[subject] for subject in sentiment.keys()}
+
+    print(time.time() - t)
 
     return sentiment
 
@@ -249,15 +258,15 @@ def get_sentiment_scores(df_tweets, subjects):
     analyzer = SentimentIntensityAnalyzer()
     sentiment = {}
     for subject in subjects:
-        subject_tweets = filter_tweets(df_tweets, subject)['text']
-        sentiment_counter = collections.Counter()
-        # sentiment_counter.update(analyzer.polarity_scores(tweet)) for tweet in subject_tweets / len(subject_tweets)
-        for tweet in subject_tweets:
-            sentiment_counter.update(analyzer.polarity_scores(tweet))
-        sentiment[subject] = dict(sentiment_counter)
-        for score_type in sentiment[subject].keys():
-            sentiment[subject][score_type] /= len(subject_tweets)
+        subject_tweets = filter_tweets(df_tweets, subject.lower())
+        if len(subject_tweets) > 0:
+            compound_count = 0
+            for i, row in subject_tweets.iterrows():
+                tweet = row['text']
+                compound_count += analyzer.polarity_scores(tweet)['compound']
+            sentiment[subject] = compound_count/len(subject_tweets)
     return sentiment
+
 
 def get_sentiments_for_all_tweets(df_tweets):
     '''

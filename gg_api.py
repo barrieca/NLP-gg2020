@@ -60,6 +60,7 @@ def get_winner(year):
     '''Winners is a dictionary with the hard coded award
     names as keys, and each entry containing a single string.
     Do NOT change the name of this function or what it returns.'''
+    global winners
 
     # Get the path to the correct tweets based on the year
     data_file_path = 'gg' + str(year) + '.json'
@@ -108,8 +109,7 @@ def get_sentiment(year):
     # Sentiment Analysis
     data_file_path = 'gg' + str(year) + '.json'
     award_names = OFFICIAL_AWARDS_1315 if int(year) < 2016 else OFFICIAL_AWARDS_1819
-    sentiment_dict = gg.sentiment_analysis_helper(data_file_path, award_names, year, winners[year])
-    # print([(subject, gg.polarity_to_text(sentiment_dict[subject])) for subject in sentiment_dict])
+    sentiment_dict = gg.sentiment_analysis_helper(data_file_path, award_names, year, list(winners[year].values()))
     print("\nSentiment (of winners)\n----------------------")
     for subject in sentiment_dict:
         print(subject + ': ' + str(sentiment_dict[subject]) + ' -> ' + gg.polarity_to_text(sentiment_dict[subject]))

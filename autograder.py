@@ -226,12 +226,11 @@ def main(years, grading):
     # Running the additional goals
     for year in years:
         gg_api.get_best_dressed(year)
-        # gg_api.get_sentiment(year)
+        gg_api.get_sentiment(year)
 
 
 if __name__ == '__main__':
-    # years = ['2013', '2015']
-    years = ['2015']
+    years = ['2013', '2015']
     grading = ["hosts", "awards", "nominees", "presenters", "winner"]
 
     if len(sys.argv) > 1:

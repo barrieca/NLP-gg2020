@@ -15,9 +15,10 @@ def get_hosts(year):
     # Get the path to the correct tweets based on the year
     data_file_path = 'gg' + str(year) + '.json'
     hosts = gg.get_hosts_helper(data_file_path)
-    print('')
+    print("\nHosts\n------")
     for host in hosts:
         print('Host: ' + host)
+    print('')
     return hosts
 
 
@@ -110,7 +111,7 @@ def get_sentiment(year):
     data_file_path = 'gg' + str(year) + '.json'
     award_names = OFFICIAL_AWARDS_1315 if int(year) < 2016 else OFFICIAL_AWARDS_1819
     sentiment_dict = gg.sentiment_analysis_helper(data_file_path, award_names, year, list(winners[year].values()))
-    print("\nSentiment (of winners)\n----------------------")
+    print("\nSentiment (of winners)\n----------")
     for subject in sentiment_dict:
         print(subject + ': ' + str(sentiment_dict[subject]) + ' -> ' + gg.polarity_to_text(sentiment_dict[subject]))
     print('')

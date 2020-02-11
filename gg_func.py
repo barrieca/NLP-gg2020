@@ -27,7 +27,7 @@ def process_input_data(data_file_path):
     # Remove substrings from tweets
     data['text'] = data['text'].str.replace('#|@|RT', '') # remove hashtags
     data['text'] = data['text'].str.replace('http\S+|www.\S+', '') # remove urls
-    data['text'] = data['text'].str.replace('[G|g]olden\\s?[G|g]lobes', '') # remove golden globes
+    data['text'] = data['text'].str.replace('[G|g]olden\\s?[G|g]lobes*', '') # remove golden globes
     data['text'] = data['text'].str.replace('fuck|shit', '') # remove profanity
 
     # Lowercase all the tweets

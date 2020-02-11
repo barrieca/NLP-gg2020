@@ -249,7 +249,7 @@ def sentiment_analysis_helper(data_file_path, awards, year, winners):
 
     # print(time.time() - t)
 
-    # return sentiment
+    return sentiment
 
 def get_sentiment_scores(df_tweets, subjects):
     '''

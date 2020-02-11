@@ -224,6 +224,7 @@ def main(years, grading):
     pprint(scores)
 
     # Running the additional goals
+    print('\nAdditional Goals\n')
     for year in years:
         gg_api.get_best_dressed(year)
         gg_api.get_sentiment(year)

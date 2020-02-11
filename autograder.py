@@ -226,7 +226,7 @@ def main(years, grading):
     # Running the additional goals
     for year in years:
         gg_api.get_best_dressed(year)
-        gg_api.get_sentiment(year)
+        # gg_api.get_sentiment(year)
 
 
 if __name__ == '__main__':

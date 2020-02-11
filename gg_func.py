@@ -542,7 +542,7 @@ def get_presenters_helper(data_file_path, award_names, awards_year):
         # print("found noun frequencies") # TODO: remove before submitting
 
         # Produce the correct number of noun chunks that also exist on IMDb
-        imdb_candidates = find_imdb_objects(df_sorted_nouns, 'name', num_possible_presenters, fuzzy_threshold=0.5)
+        imdb_candidates = find_imdb_objects(df_sorted_nouns, 'name', num_possible_presenters, fuzzy_threshold=0.5, query_limit=5)
         # print("found imdb candidates") # TODO: remove before submitting
 
         # Store winner
@@ -608,7 +608,7 @@ def get_winner_helper(data_file_path, award_names, awards_year):
         # print("found noun frequencies") # TODO: remove before submitting
 
         # Produce the correct number of noun chunks that also exist on IMDb
-        imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], num_possible_winner, awards_year, award_entity_type[category] == 'movie')
+        imdb_candidates = find_imdb_objects(df_sorted_nouns, entity_type_to_imdb_type[award_entity_type[category]], num_possible_winner, awards_year, award_entity_type[category] == 'movie', query_limit=5)
         # print("found imdb candidates") # TODO: remove before submitting
 
         # Store winner
